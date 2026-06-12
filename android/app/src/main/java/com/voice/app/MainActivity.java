@@ -8,20 +8,16 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -93,10 +89,11 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
-                public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                public void onPermissionRequest(PermissionRequest request) {
+                    // Разрешаем и микрофон, и камеру
                     request.grant(new String[]{
-                        android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                        android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
                     });
                 }
             });
@@ -112,11 +109,8 @@ public class MainActivity extends BridgeActivity {
         }
         
         floatingCircle = new ImageButton(this);
-        
-        // Иконка геймпада
         floatingCircle.setImageBitmap(createXboxGamepadBitmap());
         
-        // Красный фон с обводкой (размер 136x136)
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#CC0000"));
@@ -188,7 +182,6 @@ public class MainActivity extends BridgeActivity {
         float centerX = size / 2f;
         float centerY = size / 2f;
         
-        // Корпус геймпада
         float rectWidth = 65;
         float rectHeight = 45;
         float left = centerX - rectWidth / 2;
@@ -197,16 +190,13 @@ public class MainActivity extends BridgeActivity {
         float bottom = centerY + rectHeight / 2;
         canvas.drawRoundRect(left, top, right, bottom, 18, 18, paint);
         
-        // Левая и правая части геймпада
         canvas.drawCircle(centerX - 25, centerY, 12, paint);
         canvas.drawCircle(centerX + 25, centerY, 12, paint);
         
-        // Крестовина
         paint.setStrokeWidth(5);
         canvas.drawLine(centerX - 18, centerY - 8, centerX - 18, centerY + 8, paint);
         canvas.drawLine(centerX - 22, centerY, centerX - 14, centerY, paint);
         
-        // Кнопки ABXY
         canvas.drawCircle(centerX + 18, centerY - 6, 5, paint);
         canvas.drawCircle(centerX + 18, centerY + 6, 5, paint);
         canvas.drawCircle(centerX + 26, centerY, 5, paint);
@@ -229,22 +219,23 @@ public class MainActivity extends BridgeActivity {
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         overlayLayout.setPadding(15, 15, 15, 15);
         
-        // WebView
+        // WebView с поддержкой видео
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setDomStorageEnabled(true);
-        webSettings.setAllowFileAccess(false);
-        webSettings.setAllowContentAccess(false);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setUseWideViewPort(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
         
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
-            public void onPermissionRequest(android.webkit.PermissionRequest request) {
-                request.grant(new String[]{
-                    android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                    android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE
-                });
+            public void onPermissionRequest(PermissionRequest request) {
+                // Разрешаем ВСЁ: микрофон, камеру, всё
+                request.grant(request.getResources());
             }
         });
         webView.setWebViewClient(new WebViewClient());
@@ -264,26 +255,7 @@ public class MainActivity extends BridgeActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         buttonPanel.setLayoutParams(panelParams);
         
-        // Кнопка сворачивания в кружок (красивая)
-        Button minimizeButton = new Button(this);
-        minimizeButton.setText("🔘 СВЕРНУТЬ");
-        minimizeButton.setTextSize(14);
-        minimizeButton.setTextColor(Color.WHITE);
-        minimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
-        minimizeButton.setPadding(25, 12, 25, 12);
-        minimizeButton.setAllCaps(false);
-        LinearLayout.LayoutParams minParams = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        minParams.setMargins(0, 0, 10, 0);
-        minimizeButton.setLayoutParams(minParams);
-        minimizeButton.setOnClickListener(v -> {
-            hideOverlay();
-            if (floatingCircle != null) {
-                floatingCircle.setVisibility(View.VISIBLE);
-            }
-        });
-        
-        // Кнопка закрытия приложения (красная корзина)
+        // Кнопка ЗАКРЫТЬ (корзина) — СЛЕВА
         Button closeButton = new Button(this);
         closeButton.setText("🗑 ЗАКРЫТЬ");
         closeButton.setTextSize(14);
@@ -293,26 +265,41 @@ public class MainActivity extends BridgeActivity {
         closeButton.setAllCaps(false);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        closeParams.setMargins(0, 0, 10, 0);
         closeButton.setLayoutParams(closeParams);
         closeButton.setOnClickListener(v -> {
-            // Закрываем оверлей
             hideOverlay();
-            // Удаляем кружок
             if (floatingCircle != null && windowManager != null) {
                 windowManager.removeView(floatingCircle);
                 floatingCircle = null;
             }
-            // Закрываем приложение
             finishAffinity();
         });
         
-        buttonPanel.addView(minimizeButton);
-        buttonPanel.addView(closeButton);
+        // Кнопка СВЕРНУТЬ — СПРАВА
+        Button minimizeButton = new Button(this);
+        minimizeButton.setText("🔘 СВЕРНУТЬ");
+        minimizeButton.setTextSize(14);
+        minimizeButton.setTextColor(Color.WHITE);
+        minimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
+        minimizeButton.setPadding(25, 12, 25, 12);
+        minimizeButton.setAllCaps(false);
+        LinearLayout.LayoutParams minParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        minimizeButton.setLayoutParams(minParams);
+        minimizeButton.setOnClickListener(v -> {
+            hideOverlay();
+            if (floatingCircle != null) {
+                floatingCircle.setVisibility(View.VISIBLE);
+            }
+        });
+        
+        buttonPanel.addView(closeButton);     // Корзина слева
+        buttonPanel.addView(minimizeButton);  // Свернуть справа
         
         overlayLayout.addView(webView);
         overlayLayout.addView(buttonPanel);
         
-        // Окно на весь экран
         overlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -366,6 +353,8 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == REQUEST_CAMERA && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
             }
         }
     }
