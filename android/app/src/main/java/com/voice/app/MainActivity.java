@@ -1,11 +1,6 @@
 package com.voice.app;
 
 import android.Manifest;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -30,7 +25,6 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
@@ -38,8 +32,6 @@ public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    private static final String CHANNEL_ID = "voice_channel";
-    private static final int NOTIFICATION_ID = 1;
     
     private WindowManager windowManager;
     private ImageButton floatingCircle;
@@ -74,8 +66,9 @@ public class MainActivity extends BridgeActivity {
             createFloatingCircle();
         }
         
-        // ЗАПУСКАЕМ FOREGROUND SERVICE — ЭТО ГЛАВНОЕ!
-        startForegroundService();
+        // ЗАПУСКАЕМ FOREGROUND SERVICE
+        Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
+        ContextCompat.startForegroundService(this, serviceIntent);
         
         // Настройка WebView для микрофона
         if (bridge != null && bridge.getWebView() != null) {
@@ -86,39 +79,6 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
-    }
-
-    private void startForegroundService() {
-        // Создаём канал уведомлений (для Android 8+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Голосовой чат",
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Приложение использует микрофон для голосового чата");
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
-        }
-        
-        // Intent для открытия приложения при нажатии на уведомление
-        Intent intent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        
-        // Создаём уведомление
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("🎤 Голосовой чат активен")
-                .setContentText("Микрофон работает в фоне")
-                .setSmallIcon(android.R.drawable.ic_menu_call)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
-        
-        // Запускаем foreground service
-        startForeground(NOTIFICATION_ID, notification);
     }
 
     private void createFloatingCircle() {
@@ -293,8 +253,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Останавливаем foreground service
-        stopForeground(true);
         if (floatingCircle != null && windowManager != null) {
             windowManager.removeView(floatingCircle);
         }
