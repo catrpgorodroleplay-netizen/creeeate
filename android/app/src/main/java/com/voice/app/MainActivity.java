@@ -16,6 +16,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -28,6 +29,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -111,20 +113,20 @@ public class MainActivity extends BridgeActivity {
         
         floatingCircle = new ImageButton(this);
         
-        // Создаём иконку геймпада Xbox в кружке
+        // Иконка геймпада
         floatingCircle.setImageBitmap(createXboxGamepadBitmap());
         
-        // Красный фон с обводкой
+        // Красный фон с обводкой (размер 136x136)
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(Color.parseColor("#CC0000")); // Красный фон
-        drawable.setStroke(4, Color.parseColor("#FF4444")); // Светло-красная обводка
+        drawable.setColor(Color.parseColor("#CC0000"));
+        drawable.setStroke(6, Color.parseColor("#FF6666"));
         floatingCircle.setBackground(drawable);
-        floatingCircle.setPadding(15, 15, 15, 15);
+        floatingCircle.setPadding(25, 25, 25, 25);
         floatingCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
         circleParams = new WindowManager.LayoutParams(
-                80, 80, layoutFlag,
+                136, 136, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
@@ -174,43 +176,41 @@ public class MainActivity extends BridgeActivity {
     }
     
     private Bitmap createXboxGamepadBitmap() {
-        int size = 60; // Размер иконки
+        int size = 90;
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
         paint.setAntiAlias(true);
         paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4);
+        paint.setStrokeWidth(6);
         
-        // Рисуем простой геймпад Xbox
         float centerX = size / 2f;
         float centerY = size / 2f;
         
-        // Корпус геймпада (закруглённый прямоугольник)
-        float rectWidth = 45;
-        float rectHeight = 30;
+        // Корпус геймпада
+        float rectWidth = 65;
+        float rectHeight = 45;
         float left = centerX - rectWidth / 2;
         float top = centerY - rectHeight / 2;
         float right = centerX + rectWidth / 2;
         float bottom = centerY + rectHeight / 2;
-        canvas.drawRoundRect(left, top, right, bottom, 12, 12, paint);
+        canvas.drawRoundRect(left, top, right, bottom, 18, 18, paint);
         
-        // Левая часть геймпада
-        canvas.drawCircle(centerX - 18, centerY, 8, paint);
-        // Правая часть геймпада
-        canvas.drawCircle(centerX + 18, centerY, 8, paint);
+        // Левая и правая части геймпада
+        canvas.drawCircle(centerX - 25, centerY, 12, paint);
+        canvas.drawCircle(centerX + 25, centerY, 12, paint);
         
-        // Кнопки (крестовина слева, кнопки справа)
-        paint.setStrokeWidth(3);
         // Крестовина
-        canvas.drawLine(centerX - 12, centerY - 5, centerX - 12, centerY + 5, paint);
-        canvas.drawLine(centerX - 15, centerY, centerX - 9, centerY, paint);
+        paint.setStrokeWidth(5);
+        canvas.drawLine(centerX - 18, centerY - 8, centerX - 18, centerY + 8, paint);
+        canvas.drawLine(centerX - 22, centerY, centerX - 14, centerY, paint);
+        
         // Кнопки ABXY
-        canvas.drawCircle(centerX + 12, centerY - 4, 3, paint);
-        canvas.drawCircle(centerX + 12, centerY + 4, 3, paint);
-        canvas.drawCircle(centerX + 18, centerY, 3, paint);
-        canvas.drawCircle(centerX + 6, centerY, 3, paint);
+        canvas.drawCircle(centerX + 18, centerY - 6, 5, paint);
+        canvas.drawCircle(centerX + 18, centerY + 6, 5, paint);
+        canvas.drawCircle(centerX + 26, centerY, 5, paint);
+        canvas.drawCircle(centerX + 10, centerY, 5, paint);
         
         return bitmap;
     }
@@ -227,9 +227,9 @@ public class MainActivity extends BridgeActivity {
         
         overlayLayout = new FrameLayout(this);
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
-        overlayLayout.setPadding(10, 10, 10, 10);
+        overlayLayout.setPadding(15, 15, 15, 15);
         
-        // WebView с онлайн-сайтом
+        // WebView
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -253,20 +253,29 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Кнопка сворачивания в кружок (в правом верхнем углу)
+        // Панель кнопок вверху
+        LinearLayout buttonPanel = new LinearLayout(this);
+        buttonPanel.setOrientation(LinearLayout.HORIZONTAL);
+        buttonPanel.setBackgroundColor(0xCC000000);
+        buttonPanel.setPadding(20, 15, 20, 15);
+        
+        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        buttonPanel.setLayoutParams(panelParams);
+        
+        // Кнопка сворачивания в кружок (красивая)
         Button minimizeButton = new Button(this);
-        minimizeButton.setText("🔘");
-        minimizeButton.setTextSize(24);
-        minimizeButton.setBackgroundColor(0xCC000000);
-        minimizeButton.setPadding(20, 15, 20, 15);
-        
-        FrameLayout.LayoutParams minimizeParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        minimizeParams.gravity = Gravity.TOP | Gravity.END;
-        minimizeParams.setMargins(0, 20, 20, 0);
-        minimizeButton.setLayoutParams(minimizeParams);
-        
+        minimizeButton.setText("🔘 СВЕРНУТЬ");
+        minimizeButton.setTextSize(14);
+        minimizeButton.setTextColor(Color.WHITE);
+        minimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
+        minimizeButton.setPadding(25, 12, 25, 12);
+        minimizeButton.setAllCaps(false);
+        LinearLayout.LayoutParams minParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        minParams.setMargins(0, 0, 10, 0);
+        minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
             hideOverlay();
             if (floatingCircle != null) {
@@ -274,8 +283,34 @@ public class MainActivity extends BridgeActivity {
             }
         });
         
+        // Кнопка закрытия приложения (красная корзина)
+        Button closeButton = new Button(this);
+        closeButton.setText("🗑 ЗАКРЫТЬ");
+        closeButton.setTextSize(14);
+        closeButton.setTextColor(Color.WHITE);
+        closeButton.setBackgroundColor(Color.parseColor("#DD2C00"));
+        closeButton.setPadding(25, 12, 25, 12);
+        closeButton.setAllCaps(false);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        closeButton.setLayoutParams(closeParams);
+        closeButton.setOnClickListener(v -> {
+            // Закрываем оверлей
+            hideOverlay();
+            // Удаляем кружок
+            if (floatingCircle != null && windowManager != null) {
+                windowManager.removeView(floatingCircle);
+                floatingCircle = null;
+            }
+            // Закрываем приложение
+            finishAffinity();
+        });
+        
+        buttonPanel.addView(minimizeButton);
+        buttonPanel.addView(closeButton);
+        
         overlayLayout.addView(webView);
-        overlayLayout.addView(minimizeButton);
+        overlayLayout.addView(buttonPanel);
         
         // Окно на весь экран
         overlayParams = new WindowManager.LayoutParams(
