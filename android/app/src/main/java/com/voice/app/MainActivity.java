@@ -35,16 +35,10 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     
     private WindowManager windowManager;
-    private ImageButton floatingButton;
     private FrameLayout floatingWindow;
-    private WindowManager.LayoutParams buttonParams;
     private WindowManager.LayoutParams windowParams;
-    
-    private float initialTouchX;
-    private float initialTouchY;
-    private int initialWindowX;
-    private int initialWindowY;
     private boolean isWindowVisible = false;
+    private Button nativeMinimizeButton;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -63,14 +57,10 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
-            } else {
-                createFloatingButton();
             }
-        } else {
-            createFloatingButton();
         }
         
-        // Настройка WebView для микрофона в основном приложении
+        // Настройка WebView для микрофона
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -79,9 +69,44 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+        
+        // Добавляем нативную кнопку в интерфейс приложения
+        addNativeButton();
     }
-
-    private void createFloatingButton() {
+    
+    private void addNativeButton() {
+        // Создаём кнопку
+        nativeMinimizeButton = new Button(this);
+        nativeMinimizeButton.setText("🔘 СВЕРНУТЬ В КРУЖОК");
+        nativeMinimizeButton.setTextColor(Color.WHITE);
+        nativeMinimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
+        nativeMinimizeButton.setAllCaps(false);
+        nativeMinimizeButton.setPadding(30, 20, 30, 20);
+        
+        // Параметры кнопки
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        params.bottomMargin = 100;
+        
+        // Добавляем кнопку в корневой вид
+        View rootView = findViewById(android.R.id.content);
+        if (rootView instanceof FrameLayout) {
+            ((FrameLayout) rootView).addView(nativeMinimizeButton, params);
+        }
+        
+        // Обработчик нажатия
+        nativeMinimizeButton.setOnClickListener(v -> {
+            // Показываем плавающий кружок и сворачиваем приложение
+            showFloatingCircle();
+            moveTaskToBack(true);
+            Toast.makeText(this, "🔘 Приложение свернуто, микрофон работает", Toast.LENGTH_SHORT).show();
+        });
+    }
+    
+    private void showFloatingCircle() {
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -89,157 +114,83 @@ public class MainActivity extends BridgeActivity {
             layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
         }
         
-        floatingButton = new ImageButton(this);
-        floatingButton.setImageResource(android.R.drawable.ic_menu_camera);
+        // Создаём плавающий кружок
+        ImageButton floatingCircle = new ImageButton(this);
+        floatingCircle.setImageResource(android.R.drawable.ic_menu_camera);
         
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#4CAF50"));
         drawable.setStroke(3, Color.WHITE);
-        floatingButton.setBackground(drawable);
-        floatingButton.setPadding(20, 20, 20, 20);
-        floatingButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        floatingCircle.setBackground(drawable);
+        floatingCircle.setPadding(20, 20, 20, 20);
+        floatingCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
-        buttonParams = new WindowManager.LayoutParams(
-                80, 80, layoutFlag,
+        WindowManager.LayoutParams circleParams = new WindowManager.LayoutParams(
+                70, 70, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
-        buttonParams.gravity = Gravity.TOP | Gravity.START;
-        buttonParams.x = 100;
-        buttonParams.y = 200;
+        circleParams.gravity = Gravity.TOP | Gravity.START;
+        circleParams.x = 100;
+        circleParams.y = 200;
         
-        floatingButton.setOnTouchListener((view, event) -> {
+        // Перетаскивание кружка
+        final float[] initialTouchX = {0};
+        final float[] initialTouchY = {0};
+        final int[] initialWindowX = {0};
+        final int[] initialWindowY = {0};
+        
+        floatingCircle.setOnTouchListener((view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    initialTouchX = event.getRawX();
-                    initialTouchY = event.getRawY();
-                    initialWindowX = buttonParams.x;
-                    initialWindowY = buttonParams.y;
+                    initialTouchX[0] = event.getRawX();
+                    initialTouchY[0] = event.getRawY();
+                    initialWindowX[0] = circleParams.x;
+                    initialWindowY[0] = circleParams.y;
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    buttonParams.x = initialWindowX + (int) (event.getRawX() - initialTouchX);
-                    buttonParams.y = initialWindowY + (int) (event.getRawY() - initialTouchY);
-                    if (windowManager != null && floatingButton != null) {
-                        windowManager.updateViewLayout(floatingButton, buttonParams);
+                    circleParams.x = initialWindowX[0] + (int) (event.getRawX() - initialTouchX[0]);
+                    circleParams.y = initialWindowY[0] + (int) (event.getRawY() - initialTouchY[0]);
+                    if (windowManager != null) {
+                        windowManager.updateViewLayout(floatingCircle, circleParams);
                     }
                     return true;
             }
             return false;
         });
         
-        floatingButton.setOnClickListener(v -> {
-            showFloatingWindow();
-            floatingButton.setVisibility(View.GONE);
+        // Нажатие на кружок — возвращаем приложение
+        floatingCircle.setOnClickListener(v -> {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            startActivity(intent);
+            if (windowManager != null && floatingCircle != null) {
+                windowManager.removeView(floatingCircle);
+            }
         });
         
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (windowManager != null && floatingButton != null) {
-            windowManager.addView(floatingButton, buttonParams);
-            Toast.makeText(this, "🔘 Плавающая кнопка создана", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showFloatingWindow() {
-        if (isWindowVisible) return;
-        
-        int layoutFlag;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
-        }
-        
-        floatingWindow = new FrameLayout(this);
-        floatingWindow.setBackgroundColor(Color.parseColor("#1E1E1E"));
-        
-        GradientDrawable border = new GradientDrawable();
-        border.setColor(Color.parseColor("#2C2C2C"));
-        border.setStroke(3, Color.parseColor("#4CAF50"));
-        border.setCornerRadius(20);
-        floatingWindow.setBackground(border);
-        
-        // WebView для сайта
-        WebView webView = new WebView(this);
-        WebSettings webSettings = webView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
-        webSettings.setMediaPlaybackRequiresUserGesture(false);
-        webSettings.setDomStorageEnabled(true);
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(android.webkit.PermissionRequest request) {
-                request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE});
-            }
-        });
-        webView.setWebViewClient(new WebViewClient());
-        webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        webView.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        
-        // Кнопка закрытия
-        Button closeButton = new Button(this);
-        closeButton.setText("✕ ЗАКРЫТЬ");
-        closeButton.setTextColor(Color.WHITE);
-        closeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
-        closeButton.setPadding(20, 15, 20, 15);
-        
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        closeParams.gravity = Gravity.TOP | Gravity.END;
-        closeParams.setMargins(0, 10, 10, 0);
-        closeButton.setLayoutParams(closeParams);
-        
-        closeButton.setOnClickListener(v -> hideFloatingWindow());
-        
-        floatingWindow.addView(webView);
-        floatingWindow.addView(closeButton);
-        
-        windowParams = new WindowManager.LayoutParams(
-                600, 800, layoutFlag,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-        );
-        windowParams.gravity = Gravity.CENTER;
-        
-        if (windowManager != null && floatingWindow != null) {
-            windowManager.addView(floatingWindow, windowParams);
-            isWindowVisible = true;
-            Toast.makeText(this, "📱 Окно открыто", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void hideFloatingWindow() {
-        if (floatingWindow != null && windowManager != null) {
-            windowManager.removeView(floatingWindow);
-            floatingWindow = null;
-            isWindowVisible = false;
-            Toast.makeText(this, "🔘 Окно закрыто, кнопка возвращена", Toast.LENGTH_SHORT).show();
-        }
-        if (floatingButton != null) {
-            floatingButton.setVisibility(View.VISIBLE);
+        if (windowManager != null) {
+            windowManager.addView(floatingCircle, circleParams);
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (floatingButton != null) {
-            floatingButton.setVisibility(View.GONE);
-        }
-        if (floatingWindow != null && windowManager != null) {
-            windowManager.removeView(floatingWindow);
-            floatingWindow = null;
-            isWindowVisible = false;
+        // При возвращении в приложение показываем кнопку
+        if (nativeMinimizeButton != null) {
+            nativeMinimizeButton.setVisibility(View.VISIBLE);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (floatingButton != null && !isWindowVisible) {
-            floatingButton.setVisibility(View.VISIBLE);
+        // При сворачивании скрываем кнопку (она не нужна, есть кружок)
+        if (nativeMinimizeButton != null) {
+            nativeMinimizeButton.setVisibility(View.GONE);
         }
     }
 
@@ -258,11 +209,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (floatingButton != null && windowManager != null) {
-            windowManager.removeView(floatingButton);
-        }
-        if (floatingWindow != null && windowManager != null) {
-            windowManager.removeView(floatingWindow);
+        if (windowManager != null) {
+            // Очистка (кружок удалится сам при перезапуске)
         }
     }
 }
