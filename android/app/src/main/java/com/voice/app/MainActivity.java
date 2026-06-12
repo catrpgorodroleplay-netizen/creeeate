@@ -38,7 +38,6 @@ public class MainActivity extends BridgeActivity {
     
     private float startX, startY;
     private int initialX, initialY;
-    private boolean isFloatingCircleVisible = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -57,7 +56,11 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
+            } else {
+                addMinimizeButton();
             }
+        } else {
+            addMinimizeButton();
         }
         
         // Настройка WebView для микрофона
@@ -69,9 +72,6 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
-        
-        // Добавляем кнопку сворачивания
-        addMinimizeButton();
     }
     
     private void addMinimizeButton() {
@@ -96,16 +96,25 @@ public class MainActivity extends BridgeActivity {
         }
         
         minimizeButton.setOnClickListener(v -> {
-            // Показываем кружок
+            // 1. Показываем кружок
             showFloatingCircle();
-            // Сворачиваем приложение
+            // 2. Сворачиваем приложение (имитируем нажатие Home)
             moveTaskToBack(true);
-            Toast.makeText(this, "🔘 Приложение свернуто, нажмите на кружок для возврата", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "🔘 Кружок создан. Нажмите на него, чтобы вернуться.", Toast.LENGTH_LONG).show();
         });
     }
     
     private void showFloatingCircle() {
-        if (isFloatingCircleVisible) return;
+        if (windowManager == null) {
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        }
+        
+        // Удаляем старый кружок, если есть
+        if (floatingCircle != null) {
+            try {
+                windowManager.removeView(floatingCircle);
+            } catch (Exception ignored) {}
+        }
         
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -134,7 +143,7 @@ public class MainActivity extends BridgeActivity {
         circleParams.x = 100;
         circleParams.y = 200;
         
-        // Перетаскивание кружка
+        // Перетаскивание
         floatingCircle.setOnTouchListener((view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -146,43 +155,39 @@ public class MainActivity extends BridgeActivity {
                 case MotionEvent.ACTION_MOVE:
                     circleParams.x = initialX + (int) (event.getRawX() - startX);
                     circleParams.y = initialY + (int) (event.getRawY() - startY);
-                    if (windowManager != null && floatingCircle != null) {
-                        windowManager.updateViewLayout(floatingCircle, circleParams);
-                    }
+                    windowManager.updateViewLayout(floatingCircle, circleParams);
                     return true;
             }
             return false;
         });
         
-        // Нажатие на кружок — возвращаем приложение
+        // Нажатие на кружок -> возврат в приложение
         floatingCircle.setOnClickListener(v -> {
+            // Убираем кружок
+            try {
+                windowManager.removeView(floatingCircle);
+                floatingCircle = null;
+            } catch (Exception ignored) {}
+            
+            // Возвращаем приложение
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             startActivity(intent);
-            
-            // Убираем кружок
-            if (windowManager != null && floatingCircle != null) {
-                windowManager.removeView(floatingCircle);
-                isFloatingCircleVisible = false;
-            }
         });
         
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (windowManager != null) {
-            windowManager.addView(floatingCircle, circleParams);
-            isFloatingCircleVisible = true;
-        }
+        windowManager.addView(floatingCircle, circleParams);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Убираем кружок, если он был
-        if (isFloatingCircleVisible && windowManager != null && floatingCircle != null) {
-            windowManager.removeView(floatingCircle);
-            isFloatingCircleVisible = false;
+        // Убираем кружок при возврате в приложение
+        if (floatingCircle != null && windowManager != null) {
+            try {
+                windowManager.removeView(floatingCircle);
+                floatingCircle = null;
+            } catch (Exception ignored) {}
         }
-        // Показываем кнопку сворачивания
         if (minimizeButton != null) {
             minimizeButton.setVisibility(View.VISIBLE);
         }
@@ -191,7 +196,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Скрываем кнопку при сворачивании (чтобы не мешала)
+        // Не удаляем кружок! Он должен висеть.
+        // Но кнопку сворачивания прячем
         if (minimizeButton != null) {
             minimizeButton.setVisibility(View.GONE);
         }
@@ -212,10 +218,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (windowManager != null && floatingCircle != null) {
+        if (floatingCircle != null && windowManager != null) {
             try {
                 windowManager.removeView(floatingCircle);
-            } catch (Exception e) {}
+            } catch (Exception ignored) {}
         }
     }
 }
