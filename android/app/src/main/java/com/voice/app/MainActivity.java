@@ -11,39 +11,26 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    private static final int REQUEST_MICROPHONE_PERMISSION = 100;
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. Запрашиваем разрешение на микрофон при запуске
+        // 1. Запрашиваем разрешение у пользователя (это у тебя уже было)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.RECORD_AUDIO},
-                    REQUEST_MICROPHONE_PERMISSION);
+                    new String[]{Manifest.permission.RECORD_AUDIO}, 100);
         }
 
-        // 2. Настраиваем WebView — даём доступ к микрофону сайту
+        // 2. ГЛАВНОЕ: Даём разрешение самому WebView
+        // Это ключевой момент, который ты упускал.
         bridge.getWebView().setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // Автоматически разрешаем сайту использовать микрофон
-                request.grant(request.getResources());
+                // Как только сайт попросит микрофон, мы его даём.
+                // Константа RESOURCE_AUDIO_CAPTURE отвечает именно за микрофон[citation:7].
+                request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
             }
         });
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_MICROPHONE_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                android.util.Log.d("MainActivity", "✅ Микрофон разрешён");
-            } else {
-                android.util.Log.d("MainActivity", "❌ Микрофон НЕ разрешён");
-            }
-        }
     }
 }
