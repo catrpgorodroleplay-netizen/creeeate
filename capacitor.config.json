@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: 'VoiceChat',
   webDir: 'www',
   server: {
-    url: 'https://crconferensimessenger.vercel.app/',
-    cleartext: false  // для HTTPS не нужен cleartext
+    url: 'https://crconferensimessenger.vercel.app/'
+    // cleartext: false  ← удали эту строку, она не нужна для HTTPS
   }
 };
 
