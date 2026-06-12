@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Gamer Voice · Чистый звонок</title>
+    <script src="https://meet.jit.si/external_api.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: #0b0b0e;
+            color: #fff;
+            height: 100vh;
+            height: -webkit-fill-available;
+            overflow: hidden;
+        }
+
+        #jitsi-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            background: #000;
+        }
+
+        .jitsi-overlay {
+            position: fixed;
+            background: #000;
+            z-index: 50;
+            pointer-events: none;
+            display: none;
+        }
+        #overlay-left {
+            left: 0;
+            top: 0;
+            width: 70px;
+            height: 100vh;
+        }
+        #overlay-bottom {
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 80px;
+        }
+
+        #our-ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .mic-btn {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            z-index: 200;
+            pointer-events: all;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #1f1f24;
+            border: 3px solid #ff3b3b;
+            color: white;
+            font-size: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 0 30px rgba(255, 59, 59, 0.3);
+        }
+        .mic-btn:active {
+            transform: scale(0.92);
+        }
+        .mic-btn.active {
+            background: #ed4245;
+            box-shadow: 0 0 40px #ff3b3b;
+        }
+
+        .hangup-btn {
+            position: fixed;
+            bottom: 40px;
+            left: 40px;
+            z-index: 200;
+            pointer-events: all;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #ed4245;
+            color: white;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .status {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            pointer-events: none;
+            background: rgba(16, 16, 20, 0.9);
+            padding: 8px 20px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 59, 59, 0.3);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .mic-status {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            pointer-events: none;
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #aaa;
+        }
+
+        .auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #0b0b0e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .card {
+            background: #131316;
+            border-radius: 32px;
+            padding: 40px 34px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 59, 59, 0.15);
+        }
+        .logo {
+            font-size: 44px;
+            font-weight: 800;
+            background: linear-gradient(145deg, #ff3b3b, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .sub {
+            color: #a0a0b0;
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        input {
+            width: 100%;
+            background: #0a0a0c;
+            border: 1px solid #2a2a2e;
+            padding: 14px 18px;
+            border-radius: 16px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 14px;
+        }
+        .btn-primary {
+            width: 100%;
+            background: #ff3b3b;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 20px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-secondary {
+            width: 100%;
+            background: transparent;
+            border: 1px solid #3a3a40;
+            color: white;
+            padding: 16px;
+            border-radius: 20px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 500px) {
+            .mic-btn { width: 70px; height: 70px; font-size: 34px; }
+            .hangup-btn { width: 50px; height: 50px; font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="jitsi-container"></div>
+    <div id="overlay-left" class="jitsi-overlay"></div>
+    <div id="overlay-bottom" class="jitsi-overlay"></div>
+
+    <div id="our-ui" style="display: none;">
+        <div class="status" id="status-text">🎤 Микрофон включён</div>
+        <div class="mic-status" id="mic-detailed-status">⏳ ожидание...</div>
+        <div class="mic-btn" id="mic-btn">🎤</div>
+        <div class="hangup-btn" id="hangup-btn">✕</div>
+    </div>
+
+    <div id="setup-screen" class="auth-screen">
+        <div class="card">
+            <div class="logo">🎮</div>
+            <div class="sub">Голосовой чат без видео</div>
+            <input type="text" id="user-name" placeholder="Ваш ник" value="Player">
+            <button class="btn-primary" id="create-btn">✨ Создать комнату</button>
+            <button class="btn-secondary" id="show-join-btn">🔑 Присоединиться</button>
+        </div>
+    </div>
+
+    <div id="join-screen" class="auth-screen" style="display: none;">
+        <div class="card">
+            <div class="logo">🔊</div>
+            <div class="sub">Введите код комнаты</div>
+            <input type="text" id="join-code" placeholder="Код комнаты">
+            <input type="text" id="join-name" placeholder="Ваш ник" value="Guest">
+            <button class="btn-primary" id="join-btn">🔊 Войти</button>
+            <button class="btn-secondary" id="hide-join-btn">← Назад</button>
+        </div>
+    </div>
+
+    <div id="exit-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:2000;align-items:center;justify-content:center;">
+        <div style="background:#131316;border-radius:32px;padding:40px 28px;max-width:380px;text-align:center;border:1px solid #ff3b3b;">
+            <div style="font-size:64px;margin-bottom:12px;color:#ff3b3b;">📞</div>
+            <div style="font-size:24px;font-weight:700;margin-bottom:6px;color:#ff3b3b;">Покинуть?</div>
+            <div style="color:#a0a0b0;margin-bottom:24px;">Вы выйдете из комнаты.</div>
+            <div style="display:flex;gap:14px;">
+                <button id="stay-btn" style="flex:1;padding:14px;border-radius:20px;font-weight:600;cursor:pointer;border:none;background:#1f1f24;color:white;">Остаться</button>
+                <button id="leave-btn" style="flex:1;padding:14px;border-radius:20px;font-weight:600;cursor:pointer;border:none;background:#ff3b3b;color:white;">Выйти</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="bgAudio" loop style="display:none;" crossorigin="anonymous"></audio>
+
+    <script>
+        // ====================
+        // GLOBALS
+        // ====================
+        let currentRoom = '';
+        let userName = '';
+        let jitsiApi = null;
+        const server = 'meet.opensuse.org';
+        let myParticipantId = null;
+        let isMicMuted = false;
+        let hideInterval = null;
+        let bgAudio = null;
+        let keepAliveStream = null;
+        let audioContext = null;
+        let mediaStream = null;
+
+        // ====================
+        // УТИЛИТЫ
+        // ====================
+        function generateRoomCode() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 10; i++) {
+                result += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return result;
+        }
+
+        function showNotify(msg) {
+            const n = document.getElementById('notification');
+            if (!n) return;
+            n.textContent = msg;
+            n.style.display = 'block';
+            setTimeout(() => { n.style.display = 'none'; }, 3000);
+        }
+
+        // ====================
+        // ФОНОВЫЙ ЗВУК (Supabase)
+        // ====================
+        function startBackgroundAudio() {
+            try {
+                const audio = document.getElementById('bgAudio');
+                if (!audio) return;
+                const audioUrl = 'https://vaiifdxuzzqtbkowaaxe.supabase.co/storage/v1/object/public/Musik/silence-sound-effect.mp3';
+                audio.src = audioUrl;
+                audio.loop = true;
+                audio.volume = 0.08;
+                audio.crossOrigin = 'anonymous';
+                audio.play().catch(() => {
+                    document.addEventListener('click', () => {
+                        audio.play().catch(e => console.warn(e));
+                    }, { once: true });
+                });
+                bgAudio = audio;
+            } catch (e) {}
+        }
+
+        function stopBackgroundAudio() {
+            if (bgAudio) {
+                bgAudio.pause();
+                bgAudio.currentTime = 0;
+                bgAudio = null;
+            }
+        }
+
+        // ====================
+        // КОСТЫЛЬ ДЛЯ МИКРОФОНА: ПРИНУДИТЕЛЬНОЕ ПЕРЕПОДКЛЮЧЕНИЕ
+        // ====================
+        async function keepMicrophoneAlive() {
+            try {
+                if (!mediaStream || mediaStream.getAudioTracks()[0]?.readyState === 'ended') {
+                    console.log("Микрофон отключился, перезапрашиваю...");
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const track = mediaStream.getAudioTracks()[0];
+                    if (track && jitsiApi) {
+                        // Пробуем заменить трек в Jitsi
+                        try {
+                            jitsiApi.executeCommand('toggleAudio', false);
+                            setTimeout(() => {
+                                jitsiApi.executeCommand('toggleAudio', true);
+                            }, 100);
+                        } catch(e) {}
+                        updateMicStatusDisplay(track.readyState);
+                    }
+                } else if (mediaStream) {
+                    const track = mediaStream.getAudioTracks()[0];
+                    if (track) updateMicStatusDisplay(track.readyState);
+                }
+            } catch(e) {
+                console.warn("keepMicrophoneAlive error:", e);
+                document.getElementById('mic-detailed-status').innerHTML = '❌ нет доступа';
+            }
+        }
+
+        function updateMicStatusDisplay(state) {
+            const el = document.getElementById('mic-detailed-status');
+            if (!el) return;
+            if (state === 'live') {
+                el.innerHTML = '🎤 микрофон активен (live)';
+                el.style.color = '#4cff4c';
+            } else if (state === 'ended') {
+                el.innerHTML = '🔇 микрофон отключён (ended)';
+                el.style.color = '#ff8888';
+            } else {
+                el.innerHTML = `🎤 статус: ${state}`;
+                el.style.color = '#aaa';
+            }
+        }
+
+        // ВЕШАЕМ ПРОВЕРКУ КАЖДЫЕ 2 СЕКУНДЫ
+        setInterval(() => {
+            keepMicrophoneAlive();
+        }, 2000);
+
+        // ПРИ ВОЗВРАЩЕНИИ НА СТРАНИЦУ
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && mediaStream) {
+                const track = mediaStream.getAudioTracks()[0];
+                if (track && track.readyState === 'ended') {
+                    keepMicrophoneAlive();
+                }
+            }
+        });
+
+        // ====================
+        // UI FLOW
+        // ====================
+        function createRoom() {
+            userName = document.getElementById('user-name').value.trim() || 'Player';
+            currentRoom = generateRoomCode();
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('join-screen').style.display = 'none';
+            document.getElementById('our-ui').style.display = 'block';
+            document.getElementById('status-text').textContent = '🎤 Микрофон включён';
+            startJitsiConference();
+        }
+
+        function joinRoom() {
+            currentRoom = document.getElementById('join-code').value.trim();
+            userName = document.getElementById('join-name').value.trim() || 'Guest';
+            if (!currentRoom) { alert('Введите код комнаты'); return; }
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('join-screen').style.display = 'none';
+            document.getElementById('our-ui').style.display = 'block';
+            document.getElementById('status-text').textContent = '🎤 Микрофон включён';
+            startJitsiConference();
+        }
+
+        function showJoin() {
+            document.getElementById('join-screen').style.display = 'flex';
+            document.getElementById('setup-screen').style.display = 'none';
+        }
+
+        function hideJoin() {
+            document.getElementById('join-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'flex';
+        }
+
+        // ====================
+        // JITSI LAUNCH
+        // ====================
+        function startJitsiConference() {
+            const options = {
+                roomName: currentRoom,
+                width: '100%',
+                height: '100%',
+                parentNode: document.getElementById('jitsi-container'),
+                userInfo: { displayName: userName },
+                configOverwrite: {
+                    startWithAudioMuted: false,
+                    startWithVideoMuted: true,
+                    videoQuality: { disable: true },
+                    enableNoAudioDetection: true,
+                    enableNoisyMicDetection: true,
+                    prejoinPageEnabled: false,
+                    disableDeepLinking: true,
+                    disableInviteFunctions: true,
+                    disableWelcomePage: true,
+                    readOnlyName: true,
+                    enableWelcomePage: false,
+                    MOBILE_DOWNLOAD_LINK_ENABLED: false,
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    SHOW_POWERED_BY: false,
+                    TOOLBAR_BUTTONS: [],
+                    disableAudioLevels: false,
+                    disableSelfView: true,
+                    disableVideo: true,
+                },
+                interfaceConfigOverwrite: {
+                    SHOW_JITSI_WATERMARK: false,
+                    SHOW_WATERMARK_FOR_GUESTS: false,
+                    SHOW_POWERED_BY: false,
+                    MOBILE_APP_PROMO: false,
+                    SHOW_CHROME_EXTENSION_BANNER: false,
+                    DISABLE_VIDEO_BACKGROUND: true,
+                    INITIAL_TOOLBAR_TIMEOUT: 1,
+                    TOOLBAR_TIMEOUT: 1,
+                    VIDEO_QUALITY_LABEL_DISABLED: true,
+                    SHOW_AUDIO_LEVELS: true,
+                }
+            };
+
+            try {
+                jitsiApi = new JitsiMeetExternalAPI(server, options);
+
+                jitsiApi.on('readyToClose', () => showExitModal());
+
+                jitsiApi.on('videoConferenceJoined', async (data) => {
+                    myParticipantId = data.id;
+                    showNotify(`✅ Присоединились к комнате: ${currentRoom}`);
+                    document.getElementById('overlay-left').style.display = 'block';
+                    document.getElementById('overlay-bottom').style.display = 'block';
+                    hideJitsiSettings();
+                    if (hideInterval) clearInterval(hideInterval);
+                    hideInterval = setInterval(hideJitsiSettings, 800);
+                    setTimeout(autoClickBrowserJoin, 600);
+                    startBackgroundAudio();
+                    
+                    // ЗАПРАШИВАЕМ МИКРОФОН ПРИНУДИТЕЛЬНО
+                    try {
+                        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const track = mediaStream.getAudioTracks()[0];
+                        if (track) {
+                            updateMicStatusDisplay(track.readyState);
+                        }
+                    } catch(e) {
+                        console.warn("mic request failed", e);
+                    }
+                });
+
+                jitsiApi.on('participantJoined', (p) => {
+                    if (p.id === myParticipantId) return;
+                    showNotify(`🎉 ${p.displayName || 'кто-то'} присоединился`);
+                });
+
+                jitsiApi.on('participantLeft', (p) => {
+                    if (p.id === myParticipantId) return;
+                    showNotify(`👋 ${p.displayName || 'кто-то'} покинул`);
+                });
+
+            } catch (e) {
+                showNotify('Ошибка Jitsi: ' + e.message);
+            }
+        }
+
+        function hideJitsiSettings() {
+            try {
+                if (jitsiApi) {
+                    jitsiApi.executeCommand('toggleToolbar', false);
+                    jitsiApi.executeCommand('toggleFilmStrip', false);
+                }
+                const selectors = [
+                    '[class*="toolbar"]', '[class*="settings"]', '[class*="menu"]',
+                    '[aria-label*="hangup"]', '[aria-label*="settings"]', 
+                    'button', '[role="toolbar"]', '.watermark', '.powered-by'
+                ];
+                selectors.forEach(sel => {
+                    document.querySelectorAll(`#jitsi-container ${sel}`).forEach(el => {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                        el.style.opacity = '0';
+                        el.style.pointerEvents = 'none';
+                    });
+                });
+            } catch (e) {}
+        }
+
+        function autoClickBrowserJoin() {
+            try {
+                document.querySelectorAll('#jitsi-container button, #jitsi-container a').forEach(btn => {
+                    const txt = (btn.textContent || btn.innerText || '').toLowerCase();
+                    if (txt.includes('browser') || txt.includes('браузер') || txt.includes('web') || txt.includes('join')) {
+                        btn.click();
+                    }
+                });
+            } catch (e) {}
+        }
+
+        // ====================
+        // CONTROLS (глобальные)
+        // ====================
+        function toggleMic() {
+            if (!jitsiApi) return;
+            jitsiApi.executeCommand('toggleAudio');
+            isMicMuted = !isMicMuted;
+            document.getElementById('mic-btn').classList.toggle('active', isMicMuted);
+            document.getElementById('status-text').textContent = isMicMuted ? '🔇 Микрофон выключен' : '🎤 Микрофон включён';
+        }
+
+        function showExitModal() {
+            document.getElementById('exit-modal').style.display = 'flex';
+        }
+
+        function hideExitModal() {
+            document.getElementById('exit-modal').style.display = 'none';
+        }
+
+        function confirmEndCall() {
+            document.getElementById('exit-modal').style.display = 'none';
+            endCall();
+        }
+
+        function endCall() {
+            if (hideInterval) clearInterval(hideInterval);
+            document.getElementById('overlay-left').style.display = 'none';
+            document.getElementById('overlay-bottom').style.display = 'none';
+            stopBackgroundAudio();
+            if (jitsiApi) {
+                jitsiApi.dispose();
+                jitsiApi = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            document.getElementById('jitsi-container').innerHTML = '';
+            document.getElementById('our-ui').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'flex';
+            myParticipantId = null;
+            showNotify('Вы покинули комнату');
+        }
+
+        // ====================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Создаём уведомление
+            const n = document.createElement('div');
+            n.id = 'notification';
+            n.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#131316;color:white;padding:12px 24px;border-radius:40px;z-index:10000;display:none;border:1px solid #ff3b3b;backdrop-filter:blur(16px);box-shadow:0 10px 30px #00000080;font-weight:500;text-align:center;max-width:90%;';
+            document.body.appendChild(n);
+
+            // Привязка событий
+            document.getElementById('mic-btn').addEventListener('click', toggleMic);
+            document.getElementById('hangup-btn').addEventListener('click', showExitModal);
+            document.getElementById('stay-btn').addEventListener('click', hideExitModal);
+            document.getElementById('leave-btn').addEventListener('click', confirmEndCall);
+            document.getElementById('create-btn').addEventListener('click', createRoom);
+            document.getElementById('show-join-btn').addEventListener('click', showJoin);
+            document.getElementById('join-btn').addEventListener('click', joinRoom);
+            document.getElementById('hide-join-btn').addEventListener('click', hideJoin);
+        });
+
+        document.addEventListener('touchmove', (e) => { 
+            if (e.scale !== 1) e.preventDefault(); 
+        }, { passive: false });
+    </script>
+</body>
+</html>
