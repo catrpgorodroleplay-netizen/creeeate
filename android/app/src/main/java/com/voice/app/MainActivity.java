@@ -123,8 +123,9 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // ИСПРАВЛЕНО: public вместо protected
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         super.onDestroy();
         if (floatingButton != null && windowManager != null) {
             windowManager.removeView(floatingButton);
