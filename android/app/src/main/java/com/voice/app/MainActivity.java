@@ -60,16 +60,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void addFloatingButton() {
-        // Создаём круглую кнопку
         floatingButton = new ImageButton(this);
         floatingButton.setImageResource(android.R.drawable.ic_menu_camera);
         floatingButton.setBackgroundColor(0x88000000);
         floatingButton.setPadding(0, 0, 0, 0);
-        
-        // Делаем её круглой
         floatingButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
-        // Настройки плавающего окна
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -78,9 +74,7 @@ public class MainActivity extends BridgeActivity {
         }
         
         floatingParams = new WindowManager.LayoutParams(
-                100,  // ширина (100 пикселей)
-                100,  // высота (100 пикселей)
-                layoutFlag,
+                100, 100, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
@@ -89,20 +83,15 @@ public class MainActivity extends BridgeActivity {
         floatingParams.x = 100;
         floatingParams.y = 200;
         
-        // Обработчик нажатия — разворачиваем приложение
         floatingButton.setOnClickListener(v -> {
-            // Возвращаем приложение на передний план
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             startActivity(intent);
-            
-            // Прячем кнопку, пока приложение открыто
             if (floatingButton != null) {
                 floatingButton.setVisibility(View.GONE);
             }
         });
         
-        // Обработчик перетаскивания
         floatingButton.setOnTouchListener((view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -111,7 +100,6 @@ public class MainActivity extends BridgeActivity {
                     initialWindowX = floatingParams.x;
                     initialWindowY = floatingParams.y;
                     return true;
-                    
                 case MotionEvent.ACTION_MOVE:
                     floatingParams.x = initialWindowX + (int) (event.getRawX() - initialTouchX);
                     floatingParams.y = initialWindowY + (int) (event.getRawY() - initialTouchY);
@@ -121,26 +109,24 @@ public class MainActivity extends BridgeActivity {
             return false;
         });
         
-        // Добавляем кнопку на экран
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         windowManager.addView(floatingButton, floatingParams);
-        
         Toast.makeText(this, "🔘 Круглая плавающая кнопка готова", Toast.LENGTH_SHORT).show();
     }
 
+    // ИСПРАВЛЕНО: public вместо protected
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
-        // Когда приложение развёрнуто — прячем плавающую кнопку
         if (floatingButton != null) {
             floatingButton.setVisibility(View.GONE);
         }
     }
 
+    // ИСПРАВЛЕНО: public вместо protected
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
-        // Когда приложение сворачивается — показываем плавающую кнопку
         if (floatingButton != null) {
             floatingButton.setVisibility(View.VISIBLE);
         }
@@ -158,8 +144,9 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // ИСПРАВЛЕНО: public вместо protected
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         super.onDestroy();
         if (floatingButton != null && windowManager != null) {
             windowManager.removeView(floatingButton);
