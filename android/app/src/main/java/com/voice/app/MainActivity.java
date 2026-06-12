@@ -85,7 +85,7 @@ public class MainActivity extends BridgeActivity {
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Настройка WebView для микрофона и камеры
+        // Настройка WebView в основном приложении
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -165,7 +165,7 @@ public class MainActivity extends BridgeActivity {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(floatingCircle, circleParams);
-            Toast.makeText(this, "🎮 Красный кружок с геймпадом создан", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "🎮 Красный кружок создан", Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -219,7 +219,6 @@ public class MainActivity extends BridgeActivity {
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         overlayLayout.setPadding(15, 15, 15, 15);
         
-        // WebView с поддержкой видео
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -234,8 +233,19 @@ public class MainActivity extends BridgeActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // Разрешаем ВСЁ: микрофон, камеру, всё
-                request.grant(request.getResources());
+                // Явно разрешаем и микрофон, и камеру
+                java.util.ArrayList<String> granted = new java.util.ArrayList<>();
+                for (String resource : request.getResources()) {
+                    if (resource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE) ||
+                        resource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                        granted.add(resource);
+                    }
+                }
+                if (!granted.isEmpty()) {
+                    request.grant(granted.toArray(new String[0]));
+                } else {
+                    request.deny();
+                }
             }
         });
         webView.setWebViewClient(new WebViewClient());
@@ -244,7 +254,7 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Панель кнопок вверху
+        // Панель кнопок
         LinearLayout buttonPanel = new LinearLayout(this);
         buttonPanel.setOrientation(LinearLayout.HORIZONTAL);
         buttonPanel.setBackgroundColor(0xCC000000);
@@ -255,7 +265,7 @@ public class MainActivity extends BridgeActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         buttonPanel.setLayoutParams(panelParams);
         
-        // Кнопка ЗАКРЫТЬ (корзина) — СЛЕВА
+        // Кнопка ЗАКРЫТЬ (корзина)
         Button closeButton = new Button(this);
         closeButton.setText("🗑 ЗАКРЫТЬ");
         closeButton.setTextSize(14);
@@ -276,7 +286,7 @@ public class MainActivity extends BridgeActivity {
             finishAffinity();
         });
         
-        // Кнопка СВЕРНУТЬ — СПРАВА
+        // Кнопка СВЕРНУТЬ
         Button minimizeButton = new Button(this);
         minimizeButton.setText("🔘 СВЕРНУТЬ");
         minimizeButton.setTextSize(14);
@@ -294,8 +304,8 @@ public class MainActivity extends BridgeActivity {
             }
         });
         
-        buttonPanel.addView(closeButton);     // Корзина слева
-        buttonPanel.addView(minimizeButton);  // Свернуть справа
+        buttonPanel.addView(closeButton);
+        buttonPanel.addView(minimizeButton);
         
         overlayLayout.addView(webView);
         overlayLayout.addView(buttonPanel);
