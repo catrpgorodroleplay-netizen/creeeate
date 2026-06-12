@@ -15,6 +15,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
@@ -67,6 +69,16 @@ public class MainActivity extends BridgeActivity {
         } else {
             createFloatingButton();
         }
+        
+        // Настройка WebView для микрофона в основном приложении
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                    request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                }
+            });
+        }
     }
 
     private void createFloatingButton() {
@@ -77,12 +89,9 @@ public class MainActivity extends BridgeActivity {
             layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
         }
         
-        // Создаём красивую круглую кнопку
         floatingButton = new ImageButton(this);
         floatingButton.setImageResource(android.R.drawable.ic_menu_camera);
-        floatingButton.setBackgroundColor(0x00FFFFFF);
         
-        // Рисуем красивый фон (круглый градиент)
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#4CAF50"));
@@ -100,7 +109,6 @@ public class MainActivity extends BridgeActivity {
         buttonParams.x = 100;
         buttonParams.y = 200;
         
-        // Перетаскивание кнопки
         floatingButton.setOnTouchListener((view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -112,20 +120,24 @@ public class MainActivity extends BridgeActivity {
                 case MotionEvent.ACTION_MOVE:
                     buttonParams.x = initialWindowX + (int) (event.getRawX() - initialTouchX);
                     buttonParams.y = initialWindowY + (int) (event.getRawY() - initialTouchY);
-                    windowManager.updateViewLayout(floatingButton, buttonParams);
+                    if (windowManager != null && floatingButton != null) {
+                        windowManager.updateViewLayout(floatingButton, buttonParams);
+                    }
                     return true;
             }
             return false;
         });
         
-        // Нажатие на кнопку — открываем окно с сайтом
         floatingButton.setOnClickListener(v -> {
             showFloatingWindow();
             floatingButton.setVisibility(View.GONE);
         });
         
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        windowManager.addView(floatingButton, buttonParams);
+        if (windowManager != null && floatingButton != null) {
+            windowManager.addView(floatingButton, buttonParams);
+            Toast.makeText(this, "🔘 Плавающая кнопка создана", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showFloatingWindow() {
@@ -138,12 +150,9 @@ public class MainActivity extends BridgeActivity {
             layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
         }
         
-        // Создаём контейнер для окна
         floatingWindow = new FrameLayout(this);
         floatingWindow.setBackgroundColor(Color.parseColor("#1E1E1E"));
-        floatingWindow.setElevation(20);
         
-        // Рамка окна
         GradientDrawable border = new GradientDrawable();
         border.setColor(Color.parseColor("#2C2C2C"));
         border.setStroke(3, Color.parseColor("#4CAF50"));
@@ -152,8 +161,17 @@ public class MainActivity extends BridgeActivity {
         
         // WebView для сайта
         WebView webView = new WebView(this);
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setMediaPlaybackRequiresUserGesture(false);
+        webSettings.setDomStorageEnabled(true);
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            }
+        });
+        webView.setWebViewClient(new WebViewClient());
         webView.loadUrl("https://crconferensimessenger.vercel.app/");
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -161,10 +179,10 @@ public class MainActivity extends BridgeActivity {
         
         // Кнопка закрытия
         Button closeButton = new Button(this);
-        closeButton.setText("✕");
+        closeButton.setText("✕ ЗАКРЫТЬ");
         closeButton.setTextColor(Color.WHITE);
         closeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
-        closeButton.setPadding(20, 10, 20, 10);
+        closeButton.setPadding(20, 15, 20, 15);
         
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -173,14 +191,11 @@ public class MainActivity extends BridgeActivity {
         closeParams.setMargins(0, 10, 10, 0);
         closeButton.setLayoutParams(closeParams);
         
-        closeButton.setOnClickListener(v -> {
-            hideFloatingWindow();
-        });
+        closeButton.setOnClickListener(v -> hideFloatingWindow());
         
         floatingWindow.addView(webView);
         floatingWindow.addView(closeButton);
         
-        // Настройки окна
         windowParams = new WindowManager.LayoutParams(
                 600, 800, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -188,8 +203,11 @@ public class MainActivity extends BridgeActivity {
         );
         windowParams.gravity = Gravity.CENTER;
         
-        windowManager.addView(floatingWindow, windowParams);
-        isWindowVisible = true;
+        if (windowManager != null && floatingWindow != null) {
+            windowManager.addView(floatingWindow, windowParams);
+            isWindowVisible = true;
+            Toast.makeText(this, "📱 Окно открыто", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void hideFloatingWindow() {
@@ -197,8 +215,8 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(floatingWindow);
             floatingWindow = null;
             isWindowVisible = false;
+            Toast.makeText(this, "🔘 Окно закрыто, кнопка возвращена", Toast.LENGTH_SHORT).show();
         }
-        // Показываем плавающую кнопку обратно
         if (floatingButton != null) {
             floatingButton.setVisibility(View.VISIBLE);
         }
@@ -207,7 +225,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // При разворачивании приложения скрываем всё, что на экране
         if (floatingButton != null) {
             floatingButton.setVisibility(View.GONE);
         }
@@ -221,7 +238,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // При сворачивании приложения показываем плавающую кнопку
         if (floatingButton != null && !isWindowVisible) {
             floatingButton.setVisibility(View.VISIBLE);
         }
