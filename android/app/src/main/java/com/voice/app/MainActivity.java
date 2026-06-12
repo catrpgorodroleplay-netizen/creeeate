@@ -33,13 +33,12 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     
     private WindowManager windowManager;
-    private ImageButton floatingCircle;
+    public static ImageButton floatingCircle; // public static для доступа из других классов
     private FrameLayout overlayLayout;
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
     
-    // Для перетаскивания
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
@@ -111,7 +110,6 @@ public class MainActivity extends BridgeActivity {
         circleParams.x = 100;
         circleParams.y = 200;
         
-        // Обработчик с разделением на перетаскивание и нажатие
         floatingCircle.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -123,7 +121,6 @@ public class MainActivity extends BridgeActivity {
                         initialY = circleParams.y;
                         isDragging = false;
                         return true;
-                        
                     case MotionEvent.ACTION_MOVE:
                         float deltaX = event.getRawX() - startX;
                         float deltaY = event.getRawY() - startY;
@@ -136,10 +133,8 @@ public class MainActivity extends BridgeActivity {
                             windowManager.updateViewLayout(floatingCircle, circleParams);
                         }
                         return true;
-                        
                     case MotionEvent.ACTION_UP:
                         if (!isDragging) {
-                            // НЕ перетаскивали — значит, нажали
                             floatingCircle.setVisibility(View.GONE);
                             showOverlay();
                         }
@@ -152,7 +147,7 @@ public class MainActivity extends BridgeActivity {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(floatingCircle, circleParams);
-            Toast.makeText(this, "🔘 Кружок создан. Нажми на него, чтобы открыть сайт.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "🔘 Кружок создан", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -166,12 +161,10 @@ public class MainActivity extends BridgeActivity {
             layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
         }
         
-        // Создаём контейнер оверлея
         overlayLayout = new FrameLayout(this);
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         overlayLayout.setPadding(10, 10, 10, 10);
         
-        // WebView с сайтом
         WebView webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -189,7 +182,6 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Кнопка закрытия (сворачивания в кружок)
         Button closeButton = new Button(this);
         closeButton.setText("🔘");
         closeButton.setTextSize(24);
@@ -205,13 +197,14 @@ public class MainActivity extends BridgeActivity {
         
         closeButton.setOnClickListener(v -> {
             hideOverlay();
-            floatingCircle.setVisibility(View.VISIBLE);
+            if (floatingCircle != null) {
+                floatingCircle.setVisibility(View.VISIBLE);
+            }
         });
         
         overlayLayout.addView(webView);
         overlayLayout.addView(closeButton);
         
-        // Настройки оверлея
         overlayParams = new WindowManager.LayoutParams(
                 600, 800, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
