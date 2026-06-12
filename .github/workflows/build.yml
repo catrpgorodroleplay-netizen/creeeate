@@ -1,5 +1,9 @@
 name: Build APK
 
+# Включаем режим совместимости с Node.js 24 для устранения предупреждения
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     tags:
@@ -31,7 +35,7 @@ jobs:
         packages: 'platforms;android-34'
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install
 
     - name: Sync Capacitor
       run: npx cap sync android
