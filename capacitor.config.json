@@ -1,13 +1,13 @@
-import { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
-  appId: 'com.voice.app',
-  appName: 'VoiceChat',
-  webDir: 'www',
-  server: {
-    url: 'https://crconferensimessenger.vercel.app/'
-    // cleartext: false  ← удали эту строку, она не нужна для HTTPS
+{
+  "appId": "com.voice.app",
+  "appName": "VoiceChat",
+  "webDir": "www",
+  "server": {
+    "url": "https://crconferensimessenger.vercel.app/",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
   }
-};
-
-export default config;
+}
