@@ -179,14 +179,14 @@ public class MainActivity extends BridgeActivity {
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         overlayLayout.setPadding(10, 10, 10, 10);
         
-        // WebView с сохранением состояния
+        // WebView с онлайн-сайтом
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setDomStorageEnabled(true);
-        webSettings.setAllowFileAccess(true);
-        webSettings.setAllowContentAccess(true);
+        webSettings.setAllowFileAccess(false);
+        webSettings.setAllowContentAccess(false);
         
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -199,12 +199,9 @@ public class MainActivity extends BridgeActivity {
         });
         webView.setWebViewClient(new WebViewClient());
         
-        // Восстанавливаем состояние или загружаем заново
-        if (savedWebViewState != null) {
-            webView.restoreState(savedWebViewState);
-        } else {
-            webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        }
+        // ПРИНУДИТЕЛЬНО ЗАГРУЖАЕМ ОНЛАЙН-САЙТ, А НЕ ЛОКАЛЬНЫЙ HTML
+        webView.loadUrl("https://crconferensimessenger.vercel.app/");
+        
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
