@@ -16,13 +16,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -35,10 +32,13 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     
     private WindowManager windowManager;
-    private FrameLayout floatingWindow;
-    private WindowManager.LayoutParams windowParams;
-    private boolean isWindowVisible = false;
-    private Button nativeMinimizeButton;
+    private ImageButton floatingCircle;
+    private WindowManager.LayoutParams circleParams;
+    private Button minimizeButton;
+    
+    private float startX, startY;
+    private int initialX, initialY;
+    private boolean isFloatingCircleVisible = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -70,43 +70,43 @@ public class MainActivity extends BridgeActivity {
             });
         }
         
-        // Добавляем нативную кнопку в интерфейс приложения
-        addNativeButton();
+        // Добавляем кнопку сворачивания
+        addMinimizeButton();
     }
     
-    private void addNativeButton() {
-        // Создаём кнопку
-        nativeMinimizeButton = new Button(this);
-        nativeMinimizeButton.setText("🔘 СВЕРНУТЬ В КРУЖОК");
-        nativeMinimizeButton.setTextColor(Color.WHITE);
-        nativeMinimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
-        nativeMinimizeButton.setAllCaps(false);
-        nativeMinimizeButton.setPadding(30, 20, 30, 20);
+    private void addMinimizeButton() {
+        minimizeButton = new Button(this);
+        minimizeButton.setText("🔘 СВЕРНУТЬ В КРУЖОК");
+        minimizeButton.setTextColor(Color.WHITE);
+        minimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
+        minimizeButton.setAllCaps(false);
+        minimizeButton.setPadding(40, 25, 40, 25);
+        minimizeButton.setTextSize(18);
         
-        // Параметры кнопки
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
         params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        params.bottomMargin = 100;
+        params.bottomMargin = 80;
         
-        // Добавляем кнопку в корневой вид
         View rootView = findViewById(android.R.id.content);
         if (rootView instanceof FrameLayout) {
-            ((FrameLayout) rootView).addView(nativeMinimizeButton, params);
+            ((FrameLayout) rootView).addView(minimizeButton, params);
         }
         
-        // Обработчик нажатия
-        nativeMinimizeButton.setOnClickListener(v -> {
-            // Показываем плавающий кружок и сворачиваем приложение
+        minimizeButton.setOnClickListener(v -> {
+            // Показываем кружок
             showFloatingCircle();
+            // Сворачиваем приложение
             moveTaskToBack(true);
-            Toast.makeText(this, "🔘 Приложение свернуто, микрофон работает", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "🔘 Приложение свернуто, нажмите на кружок для возврата", Toast.LENGTH_LONG).show();
         });
     }
     
     private void showFloatingCircle() {
+        if (isFloatingCircleVisible) return;
+        
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -114,20 +114,19 @@ public class MainActivity extends BridgeActivity {
             layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
         }
         
-        // Создаём плавающий кружок
-        ImageButton floatingCircle = new ImageButton(this);
+        floatingCircle = new ImageButton(this);
         floatingCircle.setImageResource(android.R.drawable.ic_menu_camera);
         
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#4CAF50"));
-        drawable.setStroke(3, Color.WHITE);
+        drawable.setStroke(4, Color.WHITE);
         floatingCircle.setBackground(drawable);
-        floatingCircle.setPadding(20, 20, 20, 20);
+        floatingCircle.setPadding(25, 25, 25, 25);
         floatingCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
-        WindowManager.LayoutParams circleParams = new WindowManager.LayoutParams(
-                70, 70, layoutFlag,
+        circleParams = new WindowManager.LayoutParams(
+                85, 85, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
@@ -136,23 +135,18 @@ public class MainActivity extends BridgeActivity {
         circleParams.y = 200;
         
         // Перетаскивание кружка
-        final float[] initialTouchX = {0};
-        final float[] initialTouchY = {0};
-        final int[] initialWindowX = {0};
-        final int[] initialWindowY = {0};
-        
         floatingCircle.setOnTouchListener((view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    initialTouchX[0] = event.getRawX();
-                    initialTouchY[0] = event.getRawY();
-                    initialWindowX[0] = circleParams.x;
-                    initialWindowY[0] = circleParams.y;
+                    startX = event.getRawX();
+                    startY = event.getRawY();
+                    initialX = circleParams.x;
+                    initialY = circleParams.y;
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    circleParams.x = initialWindowX[0] + (int) (event.getRawX() - initialTouchX[0]);
-                    circleParams.y = initialWindowY[0] + (int) (event.getRawY() - initialTouchY[0]);
-                    if (windowManager != null) {
+                    circleParams.x = initialX + (int) (event.getRawX() - startX);
+                    circleParams.y = initialY + (int) (event.getRawY() - startY);
+                    if (windowManager != null && floatingCircle != null) {
                         windowManager.updateViewLayout(floatingCircle, circleParams);
                     }
                     return true;
@@ -165,32 +159,41 @@ public class MainActivity extends BridgeActivity {
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             startActivity(intent);
+            
+            // Убираем кружок
             if (windowManager != null && floatingCircle != null) {
                 windowManager.removeView(floatingCircle);
+                isFloatingCircleVisible = false;
             }
         });
         
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(floatingCircle, circleParams);
+            isFloatingCircleVisible = true;
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // При возвращении в приложение показываем кнопку
-        if (nativeMinimizeButton != null) {
-            nativeMinimizeButton.setVisibility(View.VISIBLE);
+        // Убираем кружок, если он был
+        if (isFloatingCircleVisible && windowManager != null && floatingCircle != null) {
+            windowManager.removeView(floatingCircle);
+            isFloatingCircleVisible = false;
+        }
+        // Показываем кнопку сворачивания
+        if (minimizeButton != null) {
+            minimizeButton.setVisibility(View.VISIBLE);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        // При сворачивании скрываем кнопку (она не нужна, есть кружок)
-        if (nativeMinimizeButton != null) {
-            nativeMinimizeButton.setVisibility(View.GONE);
+        // Скрываем кнопку при сворачивании (чтобы не мешала)
+        if (minimizeButton != null) {
+            minimizeButton.setVisibility(View.GONE);
         }
     }
 
@@ -209,8 +212,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (windowManager != null) {
-            // Очистка (кружок удалится сам при перезапуске)
+        if (windowManager != null && floatingCircle != null) {
+            try {
+                windowManager.removeView(floatingCircle);
+            } catch (Exception e) {}
         }
     }
 }
