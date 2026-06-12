@@ -1,6 +1,5 @@
 name: Build APK
 
-# Включаем режим совместимости с Node.js 24 для устранения предупреждения
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -27,7 +26,7 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
-        java-version: '17'
+        java-version: '21'     # ← ИСПРАВЛЕНО: было 17, стало 21
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
