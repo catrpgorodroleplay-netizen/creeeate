@@ -30,14 +30,17 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
+    private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     
     private WindowManager windowManager;
-    public static ImageButton floatingCircle; // public static для доступа из других классов
+    public static ImageButton floatingCircle;
     private FrameLayout overlayLayout;
+    private WebView webView;
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
+    private boolean isFullscreen = false;
     
     private float startX, startY;
     private int initialX, initialY;
@@ -52,6 +55,13 @@ public class MainActivity extends BridgeActivity {
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
+        }
+        
+        // Запрос камеры
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
         }
 
         // Запрос разрешения на плавающее окно
@@ -71,12 +81,15 @@ public class MainActivity extends BridgeActivity {
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Настройка WebView для микрофона
+        // Настройка WebView для микрофона и камеры
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
                 public void onPermissionRequest(android.webkit.PermissionRequest request) {
-                    request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                    request.grant(new String[]{
+                        android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                        android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                    });
                 }
             });
         }
@@ -165,28 +178,96 @@ public class MainActivity extends BridgeActivity {
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         overlayLayout.setPadding(10, 10, 10, 10);
         
-        WebView webView = new WebView(this);
-        WebSettings webSettings = webView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
-        webSettings.setMediaPlaybackRequiresUserGesture(false);
-        webSettings.setDomStorageEnabled(true);
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(android.webkit.PermissionRequest request) {
-                request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE});
-            }
-        });
-        webView.setWebViewClient(new WebViewClient());
-        webView.loadUrl("https://crconferensimessenger.vercel.app/");
+        // WebView с сохранением состояния
+        webView = new WebView(this);
+        if (savedWebView != null) {
+            webView.restoreState(savedWebView);
+        } else {
+            WebSettings webSettings = webView.getSettings();
+            webSettings.setJavaScriptEnabled(true);
+            webSettings.setMediaPlaybackRequiresUserGesture(false);
+            webSettings.setDomStorageEnabled(true);
+            webSettings.setAllowFileAccess(true);
+            webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                    request.grant(new String[]{
+                        android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                        android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                    });
+                }
+            });
+            webView.setWebViewClient(new WebViewClient());
+            webView.loadUrl("https://crconferensimessenger.vercel.app/");
+        }
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
+        // Кнопка отключения микрофона
+        Button micButton = new Button(this);
+        micButton.setText("🎤");
+        micButton.setTextSize(20);
+        micButton.setBackgroundColor(0x88000000);
+        micButton.setPadding(15, 10, 15, 10);
+        micButton.setOnClickListener(v -> {
+            if (webView != null) {
+                webView.loadUrl("javascript:toggleMicrophone()");
+            }
+        });
+        
+        // Кнопка увеличения/уменьшения окна
+        Button fullscreenButton = new Button(this);
+        fullscreenButton.setText("⛶");
+        fullscreenButton.setTextSize(20);
+        fullscreenButton.setBackgroundColor(0x88000000);
+        fullscreenButton.setPadding(15, 10, 15, 10);
+        fullscreenButton.setOnClickListener(v -> {
+            if (isFullscreen) {
+                overlayParams.width = 600;
+                overlayParams.height = 800;
+                fullscreenButton.setText("⛶");
+            } else {
+                overlayParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+                overlayParams.height = WindowManager.LayoutParams.MATCH_PARENT;
+                fullscreenButton.setText("🗗");
+            }
+            windowManager.updateViewLayout(overlayLayout, overlayParams);
+            isFullscreen = !isFullscreen;
+        });
+        
+        // Кнопка закрытия (сворачивания в кружок)
         Button closeButton = new Button(this);
         closeButton.setText("🔘");
-        closeButton.setTextSize(24);
+        closeButton.setTextSize(20);
         closeButton.setBackgroundColor(0x88000000);
         closeButton.setPadding(15, 10, 15, 10);
+        closeButton.setOnClickListener(v -> {
+            hideOverlay();
+            if (floatingCircle != null) {
+                floatingCircle.setVisibility(View.VISIBLE);
+            }
+        });
+        
+        // Панель кнопок
+        FrameLayout buttonPanel = new FrameLayout(this);
+        buttonPanel.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT));
+        
+        FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        buttonParams.gravity = Gravity.TOP | Gravity.START;
+        buttonParams.setMargins(10, 10, 0, 0);
+        micButton.setLayoutParams(buttonParams);
+        
+        FrameLayout.LayoutParams fullParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        fullParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        fullParams.setMargins(0, 10, 0, 0);
+        fullscreenButton.setLayoutParams(fullParams);
         
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -195,15 +276,12 @@ public class MainActivity extends BridgeActivity {
         closeParams.setMargins(0, 10, 10, 0);
         closeButton.setLayoutParams(closeParams);
         
-        closeButton.setOnClickListener(v -> {
-            hideOverlay();
-            if (floatingCircle != null) {
-                floatingCircle.setVisibility(View.VISIBLE);
-            }
-        });
+        buttonPanel.addView(micButton);
+        buttonPanel.addView(fullscreenButton);
+        buttonPanel.addView(closeButton);
         
         overlayLayout.addView(webView);
-        overlayLayout.addView(closeButton);
+        overlayLayout.addView(buttonPanel);
         
         overlayParams = new WindowManager.LayoutParams(
                 600, 800, layoutFlag,
@@ -220,11 +298,19 @@ public class MainActivity extends BridgeActivity {
 
     private void hideOverlay() {
         if (overlayLayout != null && windowManager != null) {
+            if (webView != null) {
+                Bundle bundle = new Bundle();
+                webView.saveState(bundle);
+                savedWebView = bundle;
+            }
             windowManager.removeView(overlayLayout);
             overlayLayout = null;
             isOverlayVisible = false;
+            isFullscreen = false;
         }
     }
+
+    private Bundle savedWebView = null;
 
     @Override
     public void onResume() {
@@ -248,8 +334,11 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == REQUEST_MICROPHONE && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_SHORT).show();
+            }
+        }
+        if (requestCode == REQUEST_CAMERA && grantResults.length > 0) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
             }
         }
     }
