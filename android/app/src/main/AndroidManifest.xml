@@ -2,21 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.voice.app">
 
-    <!-- ОСНОВНЫЕ РАЗРЕШЕНИЯ -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- РАЗРЕШЕНИЯ ДЛЯ МИКРОФОНА -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- РАЗРЕШЕНИЯ ДЛЯ ФОНОВОЙ РАБОТЫ (Foreground Service) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- РАЗРЕШЕНИЕ ДЛЯ ПЛАВАЮЩЕГО КРУЖКА (CHAT HEAD) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -27,7 +18,6 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
 
-        <!-- ГЛАВНАЯ АКТИВНОСТЬ -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -44,37 +34,10 @@
 
         </activity>
 
-        <!-- ПЛАВАЮЩЕЕ ОКНО (ДИАЛОГ) -->
-        <activity
-            android:name=".PopupActivity"
-            android:theme="@style/Theme.AppCompat.Dialog"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:launchMode="singleInstance"
-            android:configChanges="orientation|screenSize" />
-
-        <!-- ФОНОВЫЙ СЕРВИС ДЛЯ МИКРОФОНА (СОБСТВЕННЫЙ) -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
-
-        <!-- ФОНОВЫЙ СЕРВИС CAPACITOR (ДЛЯ СОВМЕСТИМОСТИ) -->
-        <service
-            android:name="com.getcapacitor.CapacitorForegroundService"
-            android:foregroundServiceType="microphone"
-            android:exported="false" />
-
-        <!-- ПРОВАЙДЕР ДЛЯ ФАЙЛОВ (НУЖЕН ДЛЯ РАБОТЫ CAPACITOR) -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
     </application>
 
