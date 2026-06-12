@@ -10,10 +10,16 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     
+    <!-- РАЗРЕШЕНИЕ ДЛЯ КАМЕРЫ -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    
     <!-- РАЗРЕШЕНИЯ ДЛЯ ФОНОВОЙ РАБОТЫ (Foreground Service) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <!-- РАЗРЕШЕНИЕ ДЛЯ ПЛАВАЮЩЕГО КРУЖКА (OVERLAY) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -25,7 +31,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <!-- ГЛАВНАЯ АКТИВНОСТЬ -->
         <activity
@@ -44,7 +51,7 @@
 
         </activity>
 
-        <!-- ФОНОВЫЙ СЕРВИС ДЛЯ МИКРОФОНА -->
+        <!-- ФОНОВЫЙ СЕРВИС ДЛЯ МИКРОФОНА (СОБСТВЕННЫЙ) -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
