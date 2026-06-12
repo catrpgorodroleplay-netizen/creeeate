@@ -2,21 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.voice.app">
 
-    <!-- Разрешения для микрофона -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- Разрешения для фоновой работы -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    
-    <!-- Разрешения для плавающего окна (PiP + overlay) -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.PICTURE_IN_PICTURE" />
-    
-    <!-- Уведомления (для Foreground Service) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -44,22 +33,10 @@
 
         </activity>
 
-        <!-- Сервис для фоновой работы с микрофоном (появится уведомление в шторке) -->
         <service
             android:name="com.getcapacitor.CapacitorForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
-
-        <!-- Провайдер для файлов (нужен для работы Capacitor) -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
     </application>
 
