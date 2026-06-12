@@ -21,7 +21,6 @@ public class VoiceForegroundService extends Service {
     }
 
     private void startForegroundService() {
-        // Создаём канал уведомлений (Android 8+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
@@ -35,12 +34,10 @@ public class VoiceForegroundService extends Service {
             }
         }
 
-        // Intent для открытия приложения при нажатии на уведомление
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Создаём уведомление
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("🎤 Голосовой чат активен")
                 .setContentText("Микрофон работает в фоне")
@@ -49,22 +46,16 @@ public class VoiceForegroundService extends Service {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
 
-        // Запускаем foreground service
         startForeground(NOTIFICATION_ID, notification);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY; // Сервис будет перезапущен, если система его убьёт
+        return START_STICKY;
     }
 
     @Override
     public IBinder onBind(Intent intent) {
         return null;
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
     }
 }
