@@ -3,8 +3,15 @@ package com.voice.app;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -40,8 +47,6 @@ public class MainActivity extends BridgeActivity {
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
-    private boolean isFullscreen = false;
-    private Bundle savedWebViewState = null;
     
     private float startX, startY;
     private int initialX, initialY;
@@ -82,7 +87,7 @@ public class MainActivity extends BridgeActivity {
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Настройка WebView для микрофона и камеры в основном приложении
+        // Настройка WebView для микрофона и камеры
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -105,18 +110,21 @@ public class MainActivity extends BridgeActivity {
         }
         
         floatingCircle = new ImageButton(this);
-        floatingCircle.setImageResource(android.R.drawable.ic_menu_camera);
         
+        // Создаём иконку геймпада Xbox в кружке
+        floatingCircle.setImageBitmap(createXboxGamepadBitmap());
+        
+        // Красный фон с обводкой
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(Color.parseColor("#4CAF50"));
-        drawable.setStroke(3, Color.WHITE);
+        drawable.setColor(Color.parseColor("#CC0000")); // Красный фон
+        drawable.setStroke(4, Color.parseColor("#FF4444")); // Светло-красная обводка
         floatingCircle.setBackground(drawable);
-        floatingCircle.setPadding(20, 20, 20, 20);
+        floatingCircle.setPadding(15, 15, 15, 15);
         floatingCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
         circleParams = new WindowManager.LayoutParams(
-                70, 70, layoutFlag,
+                80, 80, layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
@@ -161,8 +169,50 @@ public class MainActivity extends BridgeActivity {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(floatingCircle, circleParams);
-            Toast.makeText(this, "🔘 Кружок создан", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "🎮 Красный кружок с геймпадом создан", Toast.LENGTH_SHORT).show();
         }
+    }
+    
+    private Bitmap createXboxGamepadBitmap() {
+        int size = 60; // Размер иконки
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        paint.setColor(Color.WHITE);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4);
+        
+        // Рисуем простой геймпад Xbox
+        float centerX = size / 2f;
+        float centerY = size / 2f;
+        
+        // Корпус геймпада (закруглённый прямоугольник)
+        float rectWidth = 45;
+        float rectHeight = 30;
+        float left = centerX - rectWidth / 2;
+        float top = centerY - rectHeight / 2;
+        float right = centerX + rectWidth / 2;
+        float bottom = centerY + rectHeight / 2;
+        canvas.drawRoundRect(left, top, right, bottom, 12, 12, paint);
+        
+        // Левая часть геймпада
+        canvas.drawCircle(centerX - 18, centerY, 8, paint);
+        // Правая часть геймпада
+        canvas.drawCircle(centerX + 18, centerY, 8, paint);
+        
+        // Кнопки (крестовина слева, кнопки справа)
+        paint.setStrokeWidth(3);
+        // Крестовина
+        canvas.drawLine(centerX - 12, centerY - 5, centerX - 12, centerY + 5, paint);
+        canvas.drawLine(centerX - 15, centerY, centerX - 9, centerY, paint);
+        // Кнопки ABXY
+        canvas.drawCircle(centerX + 12, centerY - 4, 3, paint);
+        canvas.drawCircle(centerX + 12, centerY + 4, 3, paint);
+        canvas.drawCircle(centerX + 18, centerY, 3, paint);
+        canvas.drawCircle(centerX + 6, centerY, 3, paint);
+        
+        return bitmap;
     }
 
     private void showOverlay() {
@@ -198,96 +248,40 @@ public class MainActivity extends BridgeActivity {
             }
         });
         webView.setWebViewClient(new WebViewClient());
-        
-        // ПРИНУДИТЕЛЬНО ЗАГРУЖАЕМ ОНЛАЙН-САЙТ, А НЕ ЛОКАЛЬНЫЙ HTML
         webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Панель кнопок
-        FrameLayout buttonPanel = new FrameLayout(this);
-        buttonPanel.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT));
+        // Кнопка сворачивания в кружок (в правом верхнем углу)
+        Button minimizeButton = new Button(this);
+        minimizeButton.setText("🔘");
+        minimizeButton.setTextSize(24);
+        minimizeButton.setBackgroundColor(0xCC000000);
+        minimizeButton.setPadding(20, 15, 20, 15);
         
-        // Кнопка отключения микрофона
-        Button micButton = new Button(this);
-        micButton.setText("🎤");
-        micButton.setTextSize(20);
-        micButton.setBackgroundColor(0x88000000);
-        micButton.setPadding(15, 10, 15, 10);
-        micButton.setOnClickListener(v -> {
-            if (webView != null) {
-                webView.loadUrl("javascript:toggleMicrophone()");
-            }
-        });
+        FrameLayout.LayoutParams minimizeParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        minimizeParams.gravity = Gravity.TOP | Gravity.END;
+        minimizeParams.setMargins(0, 20, 20, 0);
+        minimizeButton.setLayoutParams(minimizeParams);
         
-        // Кнопка увеличения/уменьшения окна
-        Button fullscreenButton = new Button(this);
-        fullscreenButton.setText("⛶");
-        fullscreenButton.setTextSize(20);
-        fullscreenButton.setBackgroundColor(0x88000000);
-        fullscreenButton.setPadding(15, 10, 15, 10);
-        fullscreenButton.setOnClickListener(v -> {
-            if (isFullscreen) {
-                overlayParams.width = 600;
-                overlayParams.height = 800;
-                fullscreenButton.setText("⛶");
-            } else {
-                overlayParams.width = WindowManager.LayoutParams.MATCH_PARENT;
-                overlayParams.height = WindowManager.LayoutParams.MATCH_PARENT;
-                fullscreenButton.setText("🗗");
-            }
-            windowManager.updateViewLayout(overlayLayout, overlayParams);
-            isFullscreen = !isFullscreen;
-        });
-        
-        // Кнопка закрытия (сворачивания в кружок)
-        Button closeButton = new Button(this);
-        closeButton.setText("🔘");
-        closeButton.setTextSize(20);
-        closeButton.setBackgroundColor(0x88000000);
-        closeButton.setPadding(15, 10, 15, 10);
-        closeButton.setOnClickListener(v -> {
+        minimizeButton.setOnClickListener(v -> {
             hideOverlay();
             if (floatingCircle != null) {
                 floatingCircle.setVisibility(View.VISIBLE);
             }
         });
         
-        // Расположение кнопок
-        FrameLayout.LayoutParams micParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        micParams.gravity = Gravity.TOP | Gravity.START;
-        micParams.setMargins(10, 10, 0, 0);
-        micButton.setLayoutParams(micParams);
-        
-        FrameLayout.LayoutParams fullParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        fullParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        fullParams.setMargins(0, 10, 0, 0);
-        fullscreenButton.setLayoutParams(fullParams);
-        
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        closeParams.gravity = Gravity.TOP | Gravity.END;
-        closeParams.setMargins(0, 10, 10, 0);
-        closeButton.setLayoutParams(closeParams);
-        
-        buttonPanel.addView(micButton);
-        buttonPanel.addView(fullscreenButton);
-        buttonPanel.addView(closeButton);
-        
         overlayLayout.addView(webView);
-        overlayLayout.addView(buttonPanel);
+        overlayLayout.addView(minimizeButton);
         
+        // Окно на весь экран
         overlayParams = new WindowManager.LayoutParams(
-                600, 800, layoutFlag,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                layoutFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
@@ -300,16 +294,13 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void hideOverlay() {
-        if (overlayLayout != null && windowManager != null && webView != null) {
-            // Сохраняем состояние WebView
-            Bundle bundle = new Bundle();
-            webView.saveState(bundle);
-            savedWebViewState = bundle;
-            
+        if (overlayLayout != null && windowManager != null) {
+            if (webView != null) {
+                webView.loadUrl("about:blank");
+            }
             windowManager.removeView(overlayLayout);
             overlayLayout = null;
             isOverlayVisible = false;
-            isFullscreen = false;
         }
     }
 
@@ -335,15 +326,11 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == REQUEST_MICROPHONE && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_SHORT).show();
             }
         }
         if (requestCode == REQUEST_CAMERA && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
             }
         }
     }
