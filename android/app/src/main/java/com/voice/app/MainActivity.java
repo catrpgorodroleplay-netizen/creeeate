@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -22,10 +23,8 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -45,6 +44,7 @@ public class MainActivity extends BridgeActivity {
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
+    private Bundle webViewState = null; // Сохраняем состояние WebView
     
     private float startX, startY;
     private int initialX, initialY;
@@ -90,7 +90,6 @@ public class MainActivity extends BridgeActivity {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
                 public void onPermissionRequest(PermissionRequest request) {
-                    // Разрешаем и микрофон, и камеру
                     request.grant(new String[]{
                         PermissionRequest.RESOURCE_AUDIO_CAPTURE,
                         PermissionRequest.RESOURCE_VIDEO_CAPTURE
@@ -233,51 +232,39 @@ public class MainActivity extends BridgeActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // Явно разрешаем и микрофон, и камеру
-                java.util.ArrayList<String> granted = new java.util.ArrayList<>();
-                for (String resource : request.getResources()) {
-                    if (resource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE) ||
-                        resource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-                        granted.add(resource);
-                    }
-                }
-                if (!granted.isEmpty()) {
-                    request.grant(granted.toArray(new String[0]));
-                } else {
-                    request.deny();
-                }
+                request.grant(new String[]{
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                });
             }
         });
         webView.setWebViewClient(new WebViewClient());
-        webView.loadUrl("https://crconferensimessenger.vercel.app/");
+        
+        // Восстанавливаем состояние WebView, если оно сохранено
+        if (webViewState != null) {
+            webView.restoreState(webViewState);
+        } else {
+            webView.loadUrl("https://crconferensimessenger.vercel.app/");
+        }
+        
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Панель кнопок
-        LinearLayout buttonPanel = new LinearLayout(this);
-        buttonPanel.setOrientation(LinearLayout.HORIZONTAL);
-        buttonPanel.setBackgroundColor(0xCC000000);
-        buttonPanel.setPadding(20, 15, 20, 15);
+        // Круглая кнопка ЗАКРЫТЬ (красная, слева)
+        ImageButton closeButton = new ImageButton(this);
+        closeButton.setImageDrawable(createCloseIcon());
+        closeButton.setBackground(createCircleButtonBackground(Color.parseColor("#DD2C00")));
+        closeButton.setPadding(20, 20, 20, 20);
+        closeButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         
-        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        buttonPanel.setLayoutParams(panelParams);
-        
-        // Кнопка ЗАКРЫТЬ (корзина)
-        Button closeButton = new Button(this);
-        closeButton.setText("🗑 ЗАКРЫТЬ");
-        closeButton.setTextSize(14);
-        closeButton.setTextColor(Color.WHITE);
-        closeButton.setBackgroundColor(Color.parseColor("#DD2C00"));
-        closeButton.setPadding(25, 12, 25, 12);
-        closeButton.setAllCaps(false);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        closeParams.setMargins(0, 0, 10, 0);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
+                70, 70,
+                Gravity.TOP | Gravity.START);
+        closeParams.setMargins(20, 40, 0, 0);
         closeButton.setLayoutParams(closeParams);
         closeButton.setOnClickListener(v -> {
+            // Закрываем всё
             hideOverlay();
             if (floatingCircle != null && windowManager != null) {
                 windowManager.removeView(floatingCircle);
@@ -286,29 +273,34 @@ public class MainActivity extends BridgeActivity {
             finishAffinity();
         });
         
-        // Кнопка СВЕРНУТЬ
-        Button minimizeButton = new Button(this);
-        minimizeButton.setText("🔘 СВЕРНУТЬ");
-        minimizeButton.setTextSize(14);
-        minimizeButton.setTextColor(Color.WHITE);
-        minimizeButton.setBackgroundColor(Color.parseColor("#4CAF50"));
-        minimizeButton.setPadding(25, 12, 25, 12);
-        minimizeButton.setAllCaps(false);
-        LinearLayout.LayoutParams minParams = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        // Круглая кнопка СВЕРНУТЬ (зелёная, справа)
+        ImageButton minimizeButton = new ImageButton(this);
+        minimizeButton.setImageDrawable(createMinimizeIcon());
+        minimizeButton.setBackground(createCircleButtonBackground(Color.parseColor("#4CAF50")));
+        minimizeButton.setPadding(20, 20, 20, 20);
+        minimizeButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        
+        FrameLayout.LayoutParams minParams = new FrameLayout.LayoutParams(
+                70, 70,
+                Gravity.TOP | Gravity.END);
+        minParams.setMargins(0, 40, 20, 0);
         minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
+            // Сохраняем состояние WebView
+            Bundle bundle = new Bundle();
+            webView.saveState(bundle);
+            webViewState = bundle;
+            
+            // Сворачиваем в кружок
             hideOverlay();
             if (floatingCircle != null) {
                 floatingCircle.setVisibility(View.VISIBLE);
             }
         });
         
-        buttonPanel.addView(closeButton);
-        buttonPanel.addView(minimizeButton);
-        
         overlayLayout.addView(webView);
-        overlayLayout.addView(buttonPanel);
+        overlayLayout.addView(closeButton);
+        overlayLayout.addView(minimizeButton);
         
         overlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -324,12 +316,55 @@ public class MainActivity extends BridgeActivity {
             isOverlayVisible = true;
         }
     }
+    
+    private Drawable createCloseIcon() {
+        Bitmap bitmap = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        paint.setColor(Color.WHITE);
+        paint.setStrokeWidth(8);
+        paint.setStyle(Paint.Style.STROKE);
+        
+        float centerX = 30;
+        float centerY = 30;
+        float offset = 15;
+        
+        canvas.drawLine(centerX - offset, centerY - offset, centerX + offset, centerY + offset, paint);
+        canvas.drawLine(centerX + offset, centerY - offset, centerX - offset, centerY + offset, paint);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bitmap);
+    }
+    
+    private Drawable createMinimizeIcon() {
+        Bitmap bitmap = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        paint.setColor(Color.WHITE);
+        paint.setStrokeWidth(8);
+        paint.setStyle(Paint.Style.STROKE);
+        
+        float centerX = 30;
+        float centerY = 30;
+        float width = 25;
+        float height = 15;
+        
+        canvas.drawRect(centerX - width/2, centerY - height/2, centerX + width/2, centerY + height/2, paint);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bitmap);
+    }
+    
+    private Drawable createCircleButtonBackground(int color) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(color);
+        drawable.setStroke(4, Color.WHITE);
+        return drawable;
+    }
 
     private void hideOverlay() {
         if (overlayLayout != null && windowManager != null) {
-            if (webView != null) {
-                webView.loadUrl("about:blank");
-            }
             windowManager.removeView(overlayLayout);
             overlayLayout = null;
             isOverlayVisible = false;
@@ -363,8 +398,6 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == REQUEST_CAMERA && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
             }
         }
     }
