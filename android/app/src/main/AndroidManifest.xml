@@ -5,22 +5,26 @@
     <!-- ОСНОВНЫЕ РАЗРЕШЕНИЯ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- МИКРОФОН -->
+
+    <!-- РАЗРЕШЕНИЯ ДЛЯ МИКРОФОНА -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- КАМЕРА -->
+
+    <!-- РАЗРЕШЕНИЕ ДЛЯ КАМЕРЫ -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    
-    <!-- ФОНОВАЯ РАБОТА -->
+
+    <!-- РАЗРЕШЕНИЯ ДЛЯ ФОНОВОЙ РАБОТЫ (Foreground Service) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
-    <!-- ПЛАВАЮЩЕЕ ОКНО -->
+    <!-- РАЗРЕШЕНИЯ ДЛЯ ZEROTIER И LAN DISCOVERY -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- РАЗРЕШЕНИЕ ДЛЯ ПЛАВАЮЩЕГО КРУЖКА (OVERLAY) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
@@ -48,7 +52,7 @@
 
         </activity>
 
-        <!-- ФОНОВЫЙ СЕРВИС -->
+        <!-- ФОНОВЫЙ СЕРВИС ДЛЯ МИКРОФОНА -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
@@ -58,6 +62,16 @@
             android:name="com.getcapacitor.CapacitorForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
+
+        <!-- СЕРВИС ДЛЯ ZEROTIER (ОБЯЗАТЕЛЬНО) -->
+        <service
+            android:name="com.zerotier.sdk.VpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
