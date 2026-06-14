@@ -13,6 +13,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -31,11 +33,21 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
+import java.io.*;
+import java.net.*;
+
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
+    
+    // === НАСТРОЙКИ LAN DISCOVERY (меняй здесь) ===
+    private String serverName = "Мой мир";     // Название сервера
+    private String levelName = "Выживание";    // Название мира
+    private int gameType = 0;                  // 0=Выживание, 1=Творчество
+    private int maxPlayers = 10;               // Максимум игроков
+    // ============================================
     
     private WindowManager windowManager;
     public static ImageButton floatingCircle;
@@ -44,11 +56,16 @@ public class MainActivity extends BridgeActivity {
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
-    private Bundle webViewState = null; // Сохраняем состояние WebView
+    private Bundle webViewState = null;
     
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
+    
+    // LAN Discovery переменные
+    private boolean isDiscoveryRunning = false;
+    private Thread discoveryThread;
+    private DatagramSocket discoverySocket;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -84,6 +101,9 @@ public class MainActivity extends BridgeActivity {
         // Запуск Foreground Service
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
+        
+        // Запуск LAN Discovery через 2 секунды после старта
+        new Handler(Looper.getMainLooper()).postDelayed(() -> startDiscoveryServer(), 2000);
         
         // Настройка WebView в основном приложении
         if (bridge != null && bridge.getWebView() != null) {
@@ -240,7 +260,6 @@ public class MainActivity extends BridgeActivity {
         });
         webView.setWebViewClient(new WebViewClient());
         
-        // Восстанавливаем состояние WebView, если оно сохранено
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
@@ -264,7 +283,6 @@ public class MainActivity extends BridgeActivity {
         closeParams.setMargins(20, 40, 0, 0);
         closeButton.setLayoutParams(closeParams);
         closeButton.setOnClickListener(v -> {
-            // Закрываем всё
             hideOverlay();
             if (floatingCircle != null && windowManager != null) {
                 windowManager.removeView(floatingCircle);
@@ -286,12 +304,10 @@ public class MainActivity extends BridgeActivity {
         minParams.setMargins(0, 40, 20, 0);
         minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
-            // Сохраняем состояние WebView
             Bundle bundle = new Bundle();
             webView.saveState(bundle);
             webViewState = bundle;
             
-            // Сворачиваем в кружок
             hideOverlay();
             if (floatingCircle != null) {
                 floatingCircle.setVisibility(View.VISIBLE);
@@ -316,6 +332,61 @@ public class MainActivity extends BridgeActivity {
             isOverlayVisible = true;
         }
     }
+    
+    // ========== LAN DISCOVERY для Minecraft Bedrock ==========
+    
+    private void startDiscoveryServer() {
+        if (isDiscoveryRunning) return;
+        isDiscoveryRunning = true;
+        
+        discoveryThread = new Thread(() -> {
+            try {
+                discoverySocket = new DatagramSocket(7551);
+                discoverySocket.setBroadcast(true);
+                discoverySocket.setSoTimeout(1000);
+                
+                showToast("LAN Discovery запущен на порту 7551");
+                
+                byte[] buffer = new byte[2048];
+                while (isDiscoveryRunning) {
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        discoverySocket.receive(packet);
+                        sendSimpleResponse(packet.getAddress());
+                    } catch (SocketTimeoutException e) {
+                        // продолжаем
+                    }
+                }
+            } catch (Exception e) {
+                showToast("Ошибка Discovery: " + e.getMessage());
+            }
+        });
+        discoveryThread.start();
+    }
+    
+    private void sendSimpleResponse(InetAddress clientAddress) {
+        try {
+            String response = "SERVER:" + serverName + ":" + levelName + ":" + gameType + ":" + maxPlayers;
+            byte[] data = response.getBytes();
+            
+            DatagramPacket packet = new DatagramPacket(data, data.length, clientAddress, 7551);
+            discoverySocket.send(packet);
+        } catch (Exception e) {
+            // игнорируем ошибки отправки
+        }
+    }
+    
+    private void stopDiscoveryServer() {
+        isDiscoveryRunning = false;
+        if (discoverySocket != null && !discoverySocket.isClosed()) {
+            discoverySocket.close();
+        }
+        if (discoveryThread != null) {
+            discoveryThread.interrupt();
+        }
+    }
+    
+    // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
     
     private Drawable createCloseIcon() {
         Bitmap bitmap = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
@@ -362,6 +433,12 @@ public class MainActivity extends BridgeActivity {
         drawable.setStroke(4, Color.WHITE);
         return drawable;
     }
+    
+    private void showToast(String message) {
+        new Handler(Looper.getMainLooper()).post(() ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        );
+    }
 
     private void hideOverlay() {
         if (overlayLayout != null && windowManager != null) {
@@ -404,12 +481,13 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+        stopDiscoveryServer();
         if (floatingCircle != null && windowManager != null) {
             windowManager.removeView(floatingCircle);
         }
         if (overlayLayout != null && windowManager != null) {
             windowManager.removeView(overlayLayout);
         }
+        super.onDestroy();
     }
-}
+    }
