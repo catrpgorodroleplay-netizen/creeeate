@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -43,7 +44,6 @@ public class MainActivity extends BridgeActivity {
     private boolean isOverlayVisible = false;
     private boolean isOverlayCreated = false;
     
-    // Кружок появляется только когда приложение свёрнуто
     private ImageButton floatingCircle;
     private WindowManager.LayoutParams circleParams;
     private float startX, startY;
@@ -54,21 +54,18 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Запрос микрофона
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
         }
         
-        // Запрос камеры
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
         }
 
-        // Запрос разрешения на плавающее окно
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -77,14 +74,10 @@ public class MainActivity extends BridgeActivity {
             }
         }
         
-        // Запуск Foreground Service
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Сразу создаём оверлей на весь экран (как главное окно)
         createFullscreenOverlay();
-        
-        // Кружок пока не создаём — он появится только при сворачивании
     }
     
     private void createFullscreenOverlay() {
@@ -98,7 +91,6 @@ public class MainActivity extends BridgeActivity {
         overlayLayout = new FrameLayout(this);
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         
-        // WebView (единственный)
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -126,7 +118,6 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Красная кнопка ЗАКРЫТЬ (останавливает всё приложение)
         ImageButton closeButton = new ImageButton(this);
         closeButton.setImageDrawable(createCloseIcon());
         closeButton.setBackground(createCircleButtonBackground(Color.parseColor("#DD2C00")));
@@ -151,7 +142,6 @@ public class MainActivity extends BridgeActivity {
             finishAffinity();
         });
         
-        // Зелёная кнопка СВЕРНУТЬ В КРУЖОК
         ImageButton minimizeButton = new ImageButton(this);
         minimizeButton.setImageDrawable(createMinimizeIcon());
         minimizeButton.setBackground(createCircleButtonBackground(Color.parseColor("#4CAF50")));
@@ -164,9 +154,7 @@ public class MainActivity extends BridgeActivity {
         minParams.setMargins(0, 40, 20, 0);
         minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
-            // Сворачиваем в кружок: просто меняем размер окна
             if (windowManager != null && overlayLayout != null && overlayParams != null) {
-                // Меняем размер на маленький (кружок)
                 overlayParams.width = 136;
                 overlayParams.height = 136;
                 overlayParams.gravity = Gravity.TOP | Gravity.START;
@@ -174,7 +162,6 @@ public class MainActivity extends BridgeActivity {
                 overlayParams.y = 200;
                 windowManager.updateViewLayout(overlayLayout, overlayParams);
                 
-                // Прячем кнопки управления внутри оверлея
                 closeButton.setVisibility(View.GONE);
                 minimizeButton.setVisibility(View.GONE);
             }
@@ -250,14 +237,12 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // При возвращении в приложение разворачиваем оверлей на весь экран
         if (overlayLayout != null && overlayParams != null && windowManager != null) {
             overlayParams.width = WindowManager.LayoutParams.MATCH_PARENT;
             overlayParams.height = WindowManager.LayoutParams.MATCH_PARENT;
             overlayParams.gravity = Gravity.CENTER;
             windowManager.updateViewLayout(overlayLayout, overlayParams);
             
-            // Показываем кнопки управления снова
             if (overlayLayout.getChildCount() >= 2) {
                 View closeBtn = overlayLayout.getChildAt(1);
                 View minBtn = overlayLayout.getChildAt(2);
@@ -265,7 +250,6 @@ public class MainActivity extends BridgeActivity {
                 if (minBtn != null) minBtn.setVisibility(View.VISIBLE);
             }
         }
-        // Удаляем кружок, если он был
         if (floatingCircle != null && windowManager != null) {
             windowManager.removeView(floatingCircle);
             floatingCircle = null;
@@ -275,9 +259,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // При сворачивании приложения создаём кружок и меняем размер оверлея
         if (overlayLayout != null && overlayParams != null && windowManager != null) {
-            // Меняем размер на кружок
             overlayParams.width = 136;
             overlayParams.height = 136;
             overlayParams.gravity = Gravity.TOP | Gravity.START;
@@ -285,7 +267,6 @@ public class MainActivity extends BridgeActivity {
             overlayParams.y = 200;
             windowManager.updateViewLayout(overlayLayout, overlayParams);
             
-            // Прячем кнопки
             if (overlayLayout.getChildCount() >= 2) {
                 View closeBtn = overlayLayout.getChildAt(1);
                 View minBtn = overlayLayout.getChildAt(2);
@@ -324,4 +305,4 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(floatingCircle);
         }
     }
-            }
+                                     }
