@@ -33,21 +33,15 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
-import java.io.*;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    
-    // === НАСТРОЙКИ LAN DISCOVERY (меняй здесь) ===
-    private String serverName = "Мой мир";     // Название сервера
-    private String levelName = "Выживание";    // Название мира
-    private int gameType = 0;                  // 0=Выживание, 1=Творчество
-    private int maxPlayers = 10;               // Максимум игроков
-    // ============================================
     
     private WindowManager windowManager;
     public static ImageButton floatingCircle;
@@ -61,15 +55,15 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
-    
-    // LAN Discovery переменные
-    private boolean isDiscoveryRunning = false;
-    private Thread discoveryThread;
-    private DatagramSocket discoverySocket;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Показываем IP-адрес в тосте (LAN Discovery без сокетов)
+        String localIp = getLocalIpAddress();
+        String serverAddress = localIp + ":19132";
+        Toast.makeText(this, "Твой адрес для друзей: " + serverAddress, Toast.LENGTH_LONG).show();
 
         // Запрос микрофона
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -102,9 +96,6 @@ public class MainActivity extends BridgeActivity {
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Запуск LAN Discovery через 2 секунды после старта
-        new Handler(Looper.getMainLooper()).postDelayed(() -> startDiscoveryServer(), 2000);
-        
         // Настройка WebView в основном приложении
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
@@ -117,6 +108,26 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+    }
+
+    // Получение локального IP-адреса
+    private String getLocalIpAddress() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (!addr.isLoopbackAddress() && addr.isSiteLocalAddress()) {
+                        return addr.getHostAddress(); // Возвращает 192.168.x.x
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "0.0.0.0";
     }
 
     private void createFloatingCircle() {
@@ -333,61 +344,6 @@ public class MainActivity extends BridgeActivity {
         }
     }
     
-    // ========== LAN DISCOVERY для Minecraft Bedrock ==========
-    
-    private void startDiscoveryServer() {
-        if (isDiscoveryRunning) return;
-        isDiscoveryRunning = true;
-        
-        discoveryThread = new Thread(() -> {
-            try {
-                discoverySocket = new DatagramSocket(7551);
-                discoverySocket.setBroadcast(true);
-                discoverySocket.setSoTimeout(1000);
-                
-                showToast("LAN Discovery запущен на порту 7551");
-                
-                byte[] buffer = new byte[2048];
-                while (isDiscoveryRunning) {
-                    try {
-                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                        discoverySocket.receive(packet);
-                        sendSimpleResponse(packet.getAddress());
-                    } catch (SocketTimeoutException e) {
-                        // продолжаем
-                    }
-                }
-            } catch (Exception e) {
-                showToast("Ошибка Discovery: " + e.getMessage());
-            }
-        });
-        discoveryThread.start();
-    }
-    
-    private void sendSimpleResponse(InetAddress clientAddress) {
-        try {
-            String response = "SERVER:" + serverName + ":" + levelName + ":" + gameType + ":" + maxPlayers;
-            byte[] data = response.getBytes();
-            
-            DatagramPacket packet = new DatagramPacket(data, data.length, clientAddress, 7551);
-            discoverySocket.send(packet);
-        } catch (Exception e) {
-            // игнорируем ошибки отправки
-        }
-    }
-    
-    private void stopDiscoveryServer() {
-        isDiscoveryRunning = false;
-        if (discoverySocket != null && !discoverySocket.isClosed()) {
-            discoverySocket.close();
-        }
-        if (discoveryThread != null) {
-            discoveryThread.interrupt();
-        }
-    }
-    
-    // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
-    
     private Drawable createCloseIcon() {
         Bitmap bitmap = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
@@ -433,12 +389,6 @@ public class MainActivity extends BridgeActivity {
         drawable.setStroke(4, Color.WHITE);
         return drawable;
     }
-    
-    private void showToast(String message) {
-        new Handler(Looper.getMainLooper()).post(() ->
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-        );
-    }
 
     private void hideOverlay() {
         if (overlayLayout != null && windowManager != null) {
@@ -481,7 +431,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        stopDiscoveryServer();
         if (floatingCircle != null && windowManager != null) {
             windowManager.removeView(floatingCircle);
         }
@@ -490,4 +439,4 @@ public class MainActivity extends BridgeActivity {
         }
         super.onDestroy();
     }
-    }
+                                }
