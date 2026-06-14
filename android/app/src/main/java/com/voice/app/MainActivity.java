@@ -13,8 +13,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -33,10 +31,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.Enumeration;
-
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
@@ -50,7 +44,7 @@ public class MainActivity extends BridgeActivity {
     private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
-    private Bundle webViewState = null;
+    private boolean isOverlayCreated = false; // Флаг, создан ли оверлей
     
     private float startX, startY;
     private int initialX, initialY;
@@ -59,11 +53,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Показываем IP-адрес в тосте (LAN Discovery без сокетов)
-        String localIp = getLocalIpAddress();
-        String serverAddress = localIp + ":19132";
-        Toast.makeText(this, "Твой адрес для друзей: " + serverAddress, Toast.LENGTH_LONG).show();
 
         // Запрос микрофона
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -108,26 +97,6 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
-    }
-
-    // Получение локального IP-адреса
-    private String getLocalIpAddress() {
-        try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface iface = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement();
-                    if (!addr.isLoopbackAddress() && addr.isSiteLocalAddress()) {
-                        return addr.getHostAddress(); // Возвращает 192.168.x.x
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return "0.0.0.0";
     }
 
     private void createFloatingCircle() {
@@ -238,6 +207,19 @@ public class MainActivity extends BridgeActivity {
     private void showOverlay() {
         if (isOverlayVisible) return;
         
+        // Если оверлей ещё не создан — создаём
+        if (!isOverlayCreated) {
+            createOverlay();
+        }
+        
+        // Если оверлей создан, но скрыт — просто показываем
+        if (overlayLayout != null && overlayParams != null && windowManager != null) {
+            windowManager.addView(overlayLayout, overlayParams);
+            isOverlayVisible = true;
+        }
+    }
+    
+    private void createOverlay() {
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -270,12 +252,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
         webView.setWebViewClient(new WebViewClient());
-        
-        if (webViewState != null) {
-            webView.restoreState(webViewState);
-        } else {
-            webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        }
+        webView.loadUrl("https://crconferensimessenger.vercel.app/");
         
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -315,10 +292,7 @@ public class MainActivity extends BridgeActivity {
         minParams.setMargins(0, 40, 20, 0);
         minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
-            Bundle bundle = new Bundle();
-            webView.saveState(bundle);
-            webViewState = bundle;
-            
+            // Просто прячем оверлей, не убивая WebView
             hideOverlay();
             if (floatingCircle != null) {
                 floatingCircle.setVisibility(View.VISIBLE);
@@ -338,10 +312,7 @@ public class MainActivity extends BridgeActivity {
         );
         overlayParams.gravity = Gravity.CENTER;
         
-        if (windowManager != null) {
-            windowManager.addView(overlayLayout, overlayParams);
-            isOverlayVisible = true;
-        }
+        isOverlayCreated = true;
     }
     
     private Drawable createCloseIcon() {
@@ -391,9 +362,8 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void hideOverlay() {
-        if (overlayLayout != null && windowManager != null) {
+        if (overlayLayout != null && windowManager != null && isOverlayVisible) {
             windowManager.removeView(overlayLayout);
-            overlayLayout = null;
             isOverlayVisible = false;
         }
     }
@@ -431,12 +401,12 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        super.onDestroy();
         if (floatingCircle != null && windowManager != null) {
             windowManager.removeView(floatingCircle);
         }
-        if (overlayLayout != null && windowManager != null) {
+        if (overlayLayout != null && windowManager != null && isOverlayVisible) {
             windowManager.removeView(overlayLayout);
         }
-        super.onDestroy();
     }
-                                }
+                                                          }
