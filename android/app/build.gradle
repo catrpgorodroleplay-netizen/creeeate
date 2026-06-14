@@ -26,6 +26,8 @@ android {
 repositories {
     google()
     mavenCentral()
+    maven { url = "https://jitpack.io" }  // Добавляем JitPack для ZeroTier
+    maven { url = "https://maven.zerotier.com/repository/maven-releases" }  // Официальный репозиторий ZeroTier
 }
 
 dependencies {
@@ -38,8 +40,10 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     
-    // ZeroTier (для VPN-соединения через интернет)
-    implementation 'com.zerotier:libzt:1.12.2'
+    // ZeroTier (пробуем разные варианты)
+    implementation 'com.zerotier:libzt:1.12.2'              // официальная версия
+    // Если не сработает — попробуй:
+    // implementation 'com.github.zerotier:libzt:1.12.2'
     
     // Foreground Service для микрофона
     implementation 'androidx.core:core:1.12.0'
