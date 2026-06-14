@@ -409,4 +409,4 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(overlayLayout);
         }
     }
-                                                          }
+                             }
