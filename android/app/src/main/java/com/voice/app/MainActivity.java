@@ -8,7 +8,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -38,14 +37,15 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     
     private WindowManager windowManager;
-    public static ImageButton floatingCircle;
     private FrameLayout overlayLayout;
     private WebView webView;
-    private WindowManager.LayoutParams circleParams;
     private WindowManager.LayoutParams overlayParams;
     private boolean isOverlayVisible = false;
-    private Bundle webViewState = null; // Сохраняем состояние WebView
+    private boolean isOverlayCreated = false;
     
+    // Кружок появляется только когда приложение свёрнуто
+    private ImageButton floatingCircle;
+    private WindowManager.LayoutParams circleParams;
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
@@ -74,139 +74,20 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
-            } else {
-                createFloatingCircle();
             }
-        } else {
-            createFloatingCircle();
         }
         
         // Запуск Foreground Service
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
         
-        // Настройка WebView в основном приложении
-        if (bridge != null && bridge.getWebView() != null) {
-            bridge.getWebView().setWebChromeClient(new WebChromeClient() {
-                @Override
-                public void onPermissionRequest(PermissionRequest request) {
-                    request.grant(new String[]{
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
-                    });
-                }
-            });
-        }
-    }
-
-    private void createFloatingCircle() {
-        int layoutFlag;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            layoutFlag = WindowManager.LayoutParams.TYPE_PHONE;
-        }
+        // Сразу создаём оверлей на весь экран (как главное окно)
+        createFullscreenOverlay();
         
-        floatingCircle = new ImageButton(this);
-        floatingCircle.setImageBitmap(createXboxGamepadBitmap());
-        
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(Color.parseColor("#CC0000"));
-        drawable.setStroke(6, Color.parseColor("#FF6666"));
-        floatingCircle.setBackground(drawable);
-        floatingCircle.setPadding(25, 25, 25, 25);
-        floatingCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        
-        circleParams = new WindowManager.LayoutParams(
-                136, 136, layoutFlag,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-        );
-        circleParams.gravity = Gravity.TOP | Gravity.START;
-        circleParams.x = 100;
-        circleParams.y = 200;
-        
-        floatingCircle.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        startX = event.getRawX();
-                        startY = event.getRawY();
-                        initialX = circleParams.x;
-                        initialY = circleParams.y;
-                        isDragging = false;
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        float deltaX = event.getRawX() - startX;
-                        float deltaY = event.getRawY() - startY;
-                        if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-                            isDragging = true;
-                        }
-                        circleParams.x = initialX + (int) deltaX;
-                        circleParams.y = initialY + (int) deltaY;
-                        if (windowManager != null) {
-                            windowManager.updateViewLayout(floatingCircle, circleParams);
-                        }
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        if (!isDragging) {
-                            floatingCircle.setVisibility(View.GONE);
-                            showOverlay();
-                        }
-                        return true;
-                }
-                return false;
-            }
-        });
-        
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (windowManager != null) {
-            windowManager.addView(floatingCircle, circleParams);
-            Toast.makeText(this, "🎮 Красный кружок создан", Toast.LENGTH_SHORT).show();
-        }
+        // Кружок пока не создаём — он появится только при сворачивании
     }
     
-    private Bitmap createXboxGamepadBitmap() {
-        int size = 90;
-        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setAntiAlias(true);
-        paint.setColor(Color.WHITE);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(6);
-        
-        float centerX = size / 2f;
-        float centerY = size / 2f;
-        
-        float rectWidth = 65;
-        float rectHeight = 45;
-        float left = centerX - rectWidth / 2;
-        float top = centerY - rectHeight / 2;
-        float right = centerX + rectWidth / 2;
-        float bottom = centerY + rectHeight / 2;
-        canvas.drawRoundRect(left, top, right, bottom, 18, 18, paint);
-        
-        canvas.drawCircle(centerX - 25, centerY, 12, paint);
-        canvas.drawCircle(centerX + 25, centerY, 12, paint);
-        
-        paint.setStrokeWidth(5);
-        canvas.drawLine(centerX - 18, centerY - 8, centerX - 18, centerY + 8, paint);
-        canvas.drawLine(centerX - 22, centerY, centerX - 14, centerY, paint);
-        
-        canvas.drawCircle(centerX + 18, centerY - 6, 5, paint);
-        canvas.drawCircle(centerX + 18, centerY + 6, 5, paint);
-        canvas.drawCircle(centerX + 26, centerY, 5, paint);
-        canvas.drawCircle(centerX + 10, centerY, 5, paint);
-        
-        return bitmap;
-    }
-
-    private void showOverlay() {
-        if (isOverlayVisible) return;
-        
+    private void createFullscreenOverlay() {
         int layoutFlag;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             layoutFlag = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -216,8 +97,8 @@ public class MainActivity extends BridgeActivity {
         
         overlayLayout = new FrameLayout(this);
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
-        overlayLayout.setPadding(15, 15, 15, 15);
         
+        // WebView (единственный)
         webView = new WebView(this);
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -239,19 +120,13 @@ public class MainActivity extends BridgeActivity {
             }
         });
         webView.setWebViewClient(new WebViewClient());
-        
-        // Восстанавливаем состояние WebView, если оно сохранено
-        if (webViewState != null) {
-            webView.restoreState(webViewState);
-        } else {
-            webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        }
+        webView.loadUrl("https://crconferensimessenger.vercel.app/");
         
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         
-        // Круглая кнопка ЗАКРЫТЬ (красная, слева)
+        // Красная кнопка ЗАКРЫТЬ (останавливает всё приложение)
         ImageButton closeButton = new ImageButton(this);
         closeButton.setImageDrawable(createCloseIcon());
         closeButton.setBackground(createCircleButtonBackground(Color.parseColor("#DD2C00")));
@@ -264,16 +139,19 @@ public class MainActivity extends BridgeActivity {
         closeParams.setMargins(20, 40, 0, 0);
         closeButton.setLayoutParams(closeParams);
         closeButton.setOnClickListener(v -> {
-            // Закрываем всё
-            hideOverlay();
+            if (webView != null) {
+                webView.loadUrl("about:blank");
+            }
+            if (windowManager != null && overlayLayout != null) {
+                windowManager.removeView(overlayLayout);
+            }
             if (floatingCircle != null && windowManager != null) {
                 windowManager.removeView(floatingCircle);
-                floatingCircle = null;
             }
             finishAffinity();
         });
         
-        // Круглая кнопка СВЕРНУТЬ (зелёная, справа)
+        // Зелёная кнопка СВЕРНУТЬ В КРУЖОК
         ImageButton minimizeButton = new ImageButton(this);
         minimizeButton.setImageDrawable(createMinimizeIcon());
         minimizeButton.setBackground(createCircleButtonBackground(Color.parseColor("#4CAF50")));
@@ -286,15 +164,19 @@ public class MainActivity extends BridgeActivity {
         minParams.setMargins(0, 40, 20, 0);
         minimizeButton.setLayoutParams(minParams);
         minimizeButton.setOnClickListener(v -> {
-            // Сохраняем состояние WebView
-            Bundle bundle = new Bundle();
-            webView.saveState(bundle);
-            webViewState = bundle;
-            
-            // Сворачиваем в кружок
-            hideOverlay();
-            if (floatingCircle != null) {
-                floatingCircle.setVisibility(View.VISIBLE);
+            // Сворачиваем в кружок: просто меняем размер окна
+            if (windowManager != null && overlayLayout != null && overlayParams != null) {
+                // Меняем размер на маленький (кружок)
+                overlayParams.width = 136;
+                overlayParams.height = 136;
+                overlayParams.gravity = Gravity.TOP | Gravity.START;
+                overlayParams.x = 100;
+                overlayParams.y = 200;
+                windowManager.updateViewLayout(overlayLayout, overlayParams);
+                
+                // Прячем кнопки управления внутри оверлея
+                closeButton.setVisibility(View.GONE);
+                minimizeButton.setVisibility(View.GONE);
             }
         });
         
@@ -311,8 +193,10 @@ public class MainActivity extends BridgeActivity {
         );
         overlayParams.gravity = Gravity.CENTER;
         
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(overlayLayout, overlayParams);
+            isOverlayCreated = true;
             isOverlayVisible = true;
         }
     }
@@ -362,28 +246,52 @@ public class MainActivity extends BridgeActivity {
         drawable.setStroke(4, Color.WHITE);
         return drawable;
     }
-
-    private void hideOverlay() {
-        if (overlayLayout != null && windowManager != null) {
-            windowManager.removeView(overlayLayout);
-            overlayLayout = null;
-            isOverlayVisible = false;
-        }
-    }
-
+    
     @Override
     public void onResume() {
         super.onResume();
-        if (floatingCircle != null && !isOverlayVisible) {
-            floatingCircle.setVisibility(View.GONE);
+        // При возвращении в приложение разворачиваем оверлей на весь экран
+        if (overlayLayout != null && overlayParams != null && windowManager != null) {
+            overlayParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+            overlayParams.height = WindowManager.LayoutParams.MATCH_PARENT;
+            overlayParams.gravity = Gravity.CENTER;
+            windowManager.updateViewLayout(overlayLayout, overlayParams);
+            
+            // Показываем кнопки управления снова
+            if (overlayLayout.getChildCount() >= 2) {
+                View closeBtn = overlayLayout.getChildAt(1);
+                View minBtn = overlayLayout.getChildAt(2);
+                if (closeBtn != null) closeBtn.setVisibility(View.VISIBLE);
+                if (minBtn != null) minBtn.setVisibility(View.VISIBLE);
+            }
+        }
+        // Удаляем кружок, если он был
+        if (floatingCircle != null && windowManager != null) {
+            windowManager.removeView(floatingCircle);
+            floatingCircle = null;
         }
     }
-
+    
     @Override
     public void onPause() {
         super.onPause();
-        if (floatingCircle != null && !isOverlayVisible) {
-            floatingCircle.setVisibility(View.VISIBLE);
+        // При сворачивании приложения создаём кружок и меняем размер оверлея
+        if (overlayLayout != null && overlayParams != null && windowManager != null) {
+            // Меняем размер на кружок
+            overlayParams.width = 136;
+            overlayParams.height = 136;
+            overlayParams.gravity = Gravity.TOP | Gravity.START;
+            overlayParams.x = 100;
+            overlayParams.y = 200;
+            windowManager.updateViewLayout(overlayLayout, overlayParams);
+            
+            // Прячем кнопки
+            if (overlayLayout.getChildCount() >= 2) {
+                View closeBtn = overlayLayout.getChildAt(1);
+                View minBtn = overlayLayout.getChildAt(2);
+                if (closeBtn != null) closeBtn.setVisibility(View.GONE);
+                if (minBtn != null) minBtn.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -405,11 +313,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (floatingCircle != null && windowManager != null) {
-            windowManager.removeView(floatingCircle);
+        if (webView != null) {
+            webView.loadUrl("about:blank");
+            webView.destroy();
         }
         if (overlayLayout != null && windowManager != null) {
             windowManager.removeView(overlayLayout);
         }
+        if (floatingCircle != null && windowManager != null) {
+            windowManager.removeView(floatingCircle);
+        }
     }
-                                         }
+                    }
