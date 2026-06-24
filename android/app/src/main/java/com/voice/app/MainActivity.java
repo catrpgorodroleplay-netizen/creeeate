@@ -62,24 +62,23 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
+    private boolean hasMicrophonePermission = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // === ЗАПУСК ФОНОВОГО СЕРВИСА СРАЗУ ===
-        startForegroundService();
+        // === СНАЧАЛА ПРОВЕРЯЕМ РАЗРЕШЕНИЯ ===
+        checkAndRequestPermissions();
 
         // === WAKE LOCK (чтобы телефон не засыпал) ===
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         if (pm != null) {
             PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyApp::WakeLock");
-            wakeLock.acquire(10 * 60 * 1000L); // 10 минут
+            wakeLock.acquire(10 * 60 * 1000L);
         }
 
-        // Разрешения
-        requestPermissionsIfNeeded();
-
+        // === ОВЕРЛЕЙ ===
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -92,6 +91,7 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
+        // === WEBVIEW ===
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -105,10 +105,51 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void startForegroundService() {
-        createNotificationChannel();
-        Intent intent = new Intent(this, VoiceForegroundService.class);
-        ContextCompat.startForegroundService(this, intent);
+    // ===== ПРОВЕРКА РАЗРЕШЕНИЙ =====
+    private void checkAndRequestPermissions() {
+        ArrayList<String> permissions = new ArrayList<>();
+
+        // Микрофон
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECORD_AUDIO);
+        } else {
+            hasMicrophonePermission = true;
+        }
+
+        // Камера
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.CAMERA);
+        }
+
+        // Уведомления (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS);
+            }
+        }
+
+        if (!permissions.isEmpty()) {
+            ActivityCompat.requestPermissions(this,
+                    permissions.toArray(new String[0]),
+                    REQUEST_MICROPHONE);
+        } else {
+            // Если все разрешения уже есть — запускаем сервис
+            startVoiceService();
+        }
+    }
+
+    private void startVoiceService() {
+        if (hasMicrophonePermission) {
+            createNotificationChannel();
+            Intent intent = new Intent(this, VoiceForegroundService.class);
+            ContextCompat.startForegroundService(this, intent);
+        } else {
+            // Если микрофон не разрешён — просто показываем тост
+            Toast.makeText(this, "Микрофон не разрешён, голосовой чат не будет работать", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void createNotificationChannel() {
@@ -123,29 +164,6 @@ public class MainActivity extends BridgeActivity {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
-        }
-    }
-
-    private void requestPermissionsIfNeeded() {
-        ArrayList<String> permissions = new ArrayList<>();
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO);
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.CAMERA);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS);
-            }
-        }
-        if (!permissions.isEmpty()) {
-            ActivityCompat.requestPermissions(this,
-                    permissions.toArray(new String[0]),
-                    REQUEST_MICROPHONE);
         }
     }
 
@@ -488,15 +506,37 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
+        
         if (code == REQUEST_MICROPHONE) {
+            boolean micGranted = false;
+            
             for (int i = 0; i < perms.length; i++) {
-                if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
+                if (perms[i].equals(Manifest.permission.RECORD_AUDIO)) {
+                    if (results[i] == PackageManager.PERMISSION_GRANTED) {
+                        micGranted = true;
+                        hasMicrophonePermission = true;
+                        Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
+                        // ЗАПУСКАЕМ СЕРВИС ПОСЛЕ РАЗРЕШЕНИЯ!
+                        startVoiceService();
+                    } else {
+                        Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_LONG).show();
+                    }
+                }
+                if (perms[i].equals(Manifest.permission.CAMERA)) {
+                    if (results[i] == PackageManager.PERMISSION_GRANTED) {
+                        Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
-        }
-        if (code == REQUEST_CAMERA && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+            
+            // Если микрофон разрешён, но сервис не запустился
+            if (micGranted) {
+                createNotificationChannel();
+                Intent intent = new Intent(this, VoiceForegroundService.class);
+                ContextCompat.startForegroundService(this, intent);
+            }
         }
     }
 
@@ -510,4 +550,4 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(mainOverlay);
         }
     }
-        }
+            }
