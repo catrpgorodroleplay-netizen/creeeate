@@ -48,12 +48,15 @@ public class ScreenRecordService extends Service {
     private String recordFilePath = "";
     private Timer recordTimer;
     private int recordSeconds = 0;
+    private boolean isPaused = false;
 
     @Override
     public void onCreate() {
         super.onCreate();
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         createNotificationChannel();
+        // Запускаем сервис в foreground сразу
+        startForeground(NOTIFICATION_ID, createNotification("⏺ Готов к записи", "Нажмите для управления"));
     }
 
     @Override
@@ -117,7 +120,9 @@ public class ScreenRecordService extends Service {
             recordSeconds = 0;
             startTimer();
 
-            startForeground(NOTIFICATION_ID, createNotification("⏺ Запись экрана", "Идёт запись..."));
+            // Обновляем уведомление
+            startForeground(NOTIFICATION_ID, createNotification("⏺ Идёт запись...", "Нажмите для остановки"));
+
             Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
             Log.e(TAG, "Ошибка записи: " + e.getMessage());
@@ -155,7 +160,7 @@ public class ScreenRecordService extends Service {
             saveToGallery();
         }
 
-        stopForeground(true);
+        stopForeground(false);
         Toast.makeText(this, "Запись остановлена. Видео сохранено в галерею", Toast.LENGTH_LONG).show();
     }
 
@@ -192,7 +197,7 @@ public class ScreenRecordService extends Service {
         recordTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (!isRunning) return;
+                if (!isRunning || isPaused) return;
                 recordSeconds++;
             }
         }, 1000, 1000);
@@ -231,4 +236,4 @@ public class ScreenRecordService extends Service {
         super.onDestroy();
         stopRecording();
     }
-        }
+}
