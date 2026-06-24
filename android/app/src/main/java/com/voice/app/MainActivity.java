@@ -1,6 +1,10 @@
 package com.voice.app;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -10,10 +14,10 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -31,6 +35,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -42,6 +47,8 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
+    private static final String CHANNEL_ID = "voice_channel";
+    private static final int NOTIFICATION_ID = 1;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -60,10 +67,19 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // === ЗАПУСК ФОНОВОГО СЕРВИСА СРАЗУ ===
+        startForegroundService();
+
+        // === WAKE LOCK (чтобы телефон не засыпал) ===
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm != null) {
+            PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyApp::WakeLock");
+            wakeLock.acquire(10 * 60 * 1000L); // 10 минут
+        }
+
         // Разрешения
         requestPermissionsIfNeeded();
 
-        // Разрешение на оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -76,7 +92,6 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // WebView
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -87,6 +102,27 @@ public class MainActivity extends BridgeActivity {
                     });
                 }
             });
+        }
+    }
+
+    private void startForegroundService() {
+        createNotificationChannel();
+        Intent intent = new Intent(this, VoiceForegroundService.class);
+        ContextCompat.startForegroundService(this, intent);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Голосовой чат",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Приложение работает в фоне");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
         }
     }
 
@@ -113,7 +149,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ГЛАВНЫЙ КРУЖОК =====
+    // ===== КРУЖОК =====
     private void createMainCircle() {
         int flag = getOverlayFlag();
         mainCircle = new ImageButton(this);
@@ -192,7 +228,6 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    // ===== ОВЕРЛЕЙ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -243,7 +278,6 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Кнопки управления
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -265,7 +299,7 @@ public class MainActivity extends BridgeActivity {
             if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
         });
 
-        // ===== ТРИ БОЛЬШИЕ КНОПКИ ВНИЗУ =====
+        // ===== ТРИ КНОПКИ ВНИЗУ =====
         LinearLayout bottomButtons = new LinearLayout(this);
         bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
         bottomButtons.setGravity(Gravity.CENTER);
@@ -277,7 +311,7 @@ public class MainActivity extends BridgeActivity {
         bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         bottomButtons.setLayoutParams(bottomP);
 
-        // 1. АВТОКЛИКЕР (открывает отдельное окно)
+        // 1. АВТОКЛИКЕР
         ImageButton clickerBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
@@ -287,7 +321,7 @@ public class MainActivity extends BridgeActivity {
             startActivity(intent);
         });
 
-        // 2. ЗАПИСЬ ЭКРАНА (открывает отдельное окно)
+        // 2. ЗАПИСЬ ЭКРАНА
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
         recordBtn.setOnClickListener(v -> {
@@ -295,7 +329,7 @@ public class MainActivity extends BridgeActivity {
             startActivity(intent);
         });
 
-        // 3. КОРЗИНА (закрывает всё)
+        // 3. КОРЗИНА
         ImageButton trashBtn = createCircleButton(createTrashIcon(), "#880E4F");
         trashBtn.setLayoutParams(btnP);
         trashBtn.setOnClickListener(v -> {
@@ -338,7 +372,6 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
     private int getOverlayFlag() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
@@ -477,4 +510,4 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(mainOverlay);
         }
     }
-    }
+        }
