@@ -25,14 +25,25 @@ public class ClickAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() { instance = null; super.onDestroy(); }
 
-    public static void performClick(ArrayList<ClickerActivity.ClickPoint> points) {
+    // ИСПРАВЛЕНО: используем ArrayList<ClickPoint> без привязки к ClickerActivity
+    public static void performClick(ArrayList<ClickPoint> points) {
         if (instance == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
-        for (ClickerActivity.ClickPoint point : points) {
+        for (ClickPoint point : points) {
             Path clickPath = new Path();
             clickPath.moveTo(point.x, point.y);
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
             instance.dispatchGesture(gestureBuilder.build(), null, null);
+        }
+    }
+
+    // ВНЕШНИЙ КЛАСС ДЛЯ ТОЧЕК
+    public static class ClickPoint {
+        public float x, y;
+        public View view;
+        public ClickPoint(float x, float y) {
+            this.x = x;
+            this.y = y;
         }
     }
 }
