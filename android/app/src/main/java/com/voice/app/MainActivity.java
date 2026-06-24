@@ -56,7 +56,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isDragging = false;
 
     // === ПРОКСИ ===
-    private LocalProxyServer proxyServer;
+    private java.net.Proxy proxy = null;
     private boolean isProxyEnabled = false;
 
     @Override
@@ -95,9 +95,6 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
-
-        // === ЗАПУСК ПРОКСИ ПРИ СТАРТЕ ===
-        startProxy();
     }
 
     private void requestPermissionsIfNeeded() {
@@ -117,34 +114,6 @@ public class MainActivity extends BridgeActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
-        }
-    }
-
-    // ===== ЗАПУСК ПРОКСИ =====
-    private void startProxy() {
-        if (proxyServer == null) {
-            proxyServer = new LocalProxyServer();
-        }
-        if (!proxyServer.isRunning()) {
-            proxyServer.start();
-            isProxyEnabled = true;
-            Toast.makeText(this, "🔒 Прокси включён (localhost:8080)", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void stopProxy() {
-        if (proxyServer != null && proxyServer.isRunning()) {
-            proxyServer.stop();
-            isProxyEnabled = false;
-            Toast.makeText(this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void toggleProxy() {
-        if (isProxyEnabled) {
-            stopProxy();
-        } else {
-            startProxy();
         }
     }
 
@@ -257,9 +226,11 @@ public class MainActivity extends BridgeActivity {
         ws.setLoadWithOverviewMode(true);
         ws.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // === НАСТРОЙКА ПРОКСИ ДЛЯ WEBVIEW ===
+        // === НАСТРОЙКА ПРОКСИ НА УРОВНЕ ЗАПРОСОВ ===
         if (isProxyEnabled) {
-            ws.setProxy("127.0.0.1", 8080);
+            proxy = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 8080));
+        } else {
+            proxy = java.net.Proxy.NO_PROXY;
         }
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -310,21 +281,25 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // === НОВАЯ КНОПКА: ВКЛ/ВЫКЛ ПРОКСИ ===
+        // КНОПКА ПРОКСИ
         ImageButton proxyBtn = createCircleButton(createProxyIcon(), isProxyEnabled ? "#4CAF50" : "#FF9800");
         FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         proxyP.setMargins(0, 0, 20, 40);
         proxyBtn.setLayoutParams(proxyP);
         proxyBtn.setOnClickListener(v -> {
-            toggleProxy();
-            // Обновляем иконку и цвет кнопки
+            isProxyEnabled = !isProxyEnabled;
+            if (isProxyEnabled) {
+                proxy = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 8080));
+                Toast.makeText(this, "🔒 Прокси включён", Toast.LENGTH_SHORT).show();
+            } else {
+                proxy = java.net.Proxy.NO_PROXY;
+                Toast.makeText(this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
+            }
+            // Обновляем иконку
             proxyBtn.setImageDrawable(createProxyIcon());
             proxyBtn.setBackground(createCircleButtonBackground(isProxyEnabled ? "#4CAF50" : "#FF9800"));
-            // Перезагружаем WebView с новыми настройками
-            if (webView != null) {
-                webView.getSettings().setProxy(isProxyEnabled ? "127.0.0.1" : null, isProxyEnabled ? 8080 : 0);
-                webView.reload();
-            }
+            // Перезагружаем страницу
+            webView.reload();
         });
 
         mainOverlay.addView(webView);
@@ -450,7 +425,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopProxy();
         if (mainCircle != null && windowManager != null) {
             windowManager.removeView(mainCircle);
         }
@@ -473,4 +447,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-                   }
+                                       }
