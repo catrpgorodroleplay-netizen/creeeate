@@ -118,7 +118,6 @@ public class ScreenRecordService extends Service {
             startTimer();
 
             startForeground(NOTIFICATION_ID, createNotification("⏺ Запись экрана", "Идёт запись..."));
-
             Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
             Log.e(TAG, "Ошибка записи: " + e.getMessage());
@@ -232,4 +231,4 @@ public class ScreenRecordService extends Service {
         super.onDestroy();
         stopRecording();
     }
-}
+        }
