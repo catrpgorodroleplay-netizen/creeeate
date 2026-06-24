@@ -71,7 +71,7 @@ public class MainActivity extends BridgeActivity {
     private WindowManager.LayoutParams autoClickerParams;
     private boolean isAutoClickerCircleVisible = false;
     private boolean isAutoClickerMenuOpen = false;
-    private ArrayList<ClickPoint> clickPoints = new ArrayList<>();
+    public static ArrayList<ClickPoint> clickPoints = new ArrayList<>();
     private Timer autoClickTimer;
     private int clickInterval = 1000;
     private int pointCounter = 1;
@@ -85,11 +85,12 @@ public class MainActivity extends BridgeActivity {
     private MediaProjectionManager projectionManager;
     private Intent screenRecordIntent;
 
-    private class ClickPoint {
-        float x, y;
-        int id;
-        View view;
-        ClickPoint(float x, float y, int id) {
+    // ===== ВНУТРЕННИЙ КЛАСС ДЛЯ ТОЧЕК =====
+    public static class ClickPoint {
+        public float x, y;
+        public int id;
+        public View view;
+        public ClickPoint(float x, float y, int id) {
             this.x = x;
             this.y = y;
             this.id = id;
@@ -659,7 +660,6 @@ public class MainActivity extends BridgeActivity {
             public void run() {
                 if (!isAutoClickerActive) return;
                 runOnUiThread(() -> {
-                    // Отправляем событие клика через AccessibilityService
                     ClickAccessibilityService.performClick(clickPoints);
                 });
             }
@@ -791,7 +791,6 @@ public class MainActivity extends BridgeActivity {
                 if (!ScreenRecordService.isRunning) {
                     screenRecordIntent = projectionManager.createScreenCaptureIntent();
                     startActivityForResult(screenRecordIntent, REQUEST_SCREEN_RECORD);
-                    // Передаём задержку в сервис
                     ScreenRecordService.delaySeconds = d;
                 }
                 popup.dismiss();
@@ -1004,4 +1003,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-                }
+                        }
