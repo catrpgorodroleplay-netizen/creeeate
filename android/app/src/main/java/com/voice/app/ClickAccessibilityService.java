@@ -25,9 +25,9 @@ public class ClickAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() { instance = null; super.onDestroy(); }
 
-    public static void performClick(ArrayList<MainActivity.ClickPoint> points) {
+    public static void performClick(ArrayList<ClickerActivity.ClickPoint> points) {
         if (instance == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
-        for (MainActivity.ClickPoint point : points) {
+        for (ClickerActivity.ClickPoint point : points) {
             Path clickPath = new Path();
             clickPath.moveTo(point.x, point.y);
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
