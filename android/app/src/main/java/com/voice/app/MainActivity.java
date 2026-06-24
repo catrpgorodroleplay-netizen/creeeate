@@ -13,6 +13,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -33,8 +35,13 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
-import java.net.InetSocketAddress;
-import java.net.Proxy;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
+// Импорты для ProxyController
+import androidx.webkit.WebViewFeature;
+import androidx.webkit.ProxyController;
+import androidx.webkit.ProxyConfig;
 
 public class MainActivity extends BridgeActivity {
 
@@ -56,17 +63,15 @@ public class MainActivity extends BridgeActivity {
     private boolean isDragging = false;
 
     // === ПРОКСИ ===
-    private java.net.Proxy proxy = null;
     private boolean isProxyEnabled = false;
+    private final Executor mainExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Разрешения
         requestPermissionsIfNeeded();
 
-        // Разрешение на оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -79,11 +84,9 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // Запуск Foreground Service для микрофона
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
 
-        // Настройка WebView
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -114,6 +117,55 @@ public class MainActivity extends BridgeActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
+        }
+    }
+
+    // ===== ПРОКСИ ЧЕРЕЗ ProxyController =====
+    private void setupProxy(boolean enable) {
+        // Проверяем, поддерживается ли прокси на этом устройстве
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            Toast.makeText(this, "Прокси не поддерживается на этом устройстве", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ProxyController proxyController = ProxyController.getInstance();
+
+        if (enable) {
+            // Сначала чистим старые настройки
+            proxyController.clearProxyOverride(mainExecutor, () -> {
+                // Создаём конфиг: все запросы через прокси 127.0.0.1:8080
+                ProxyConfig proxyConfig = new ProxyConfig.Builder()
+                        .addProxyRule("127.0.0.1:8080", ProxyConfig.HTTP)
+                        .addProxyRule("127.0.0.1:8080", ProxyConfig.HTTPS)
+                        .addBypassRule("localhost")
+                        .addBypassRule("127.0.0.1")
+                        .build();
+
+                proxyController.setProxyOverride(proxyConfig, mainExecutor, () -> {
+                    runOnUiThread(() -> {
+                        isProxyEnabled = true;
+                        Toast.makeText(MainActivity.this, "🔒 Прокси включён", Toast.LENGTH_SHORT).show();
+                        if (webView != null) webView.reload();
+                    });
+                });
+            });
+        } else {
+            // Выключаем прокси
+            proxyController.clearProxyOverride(mainExecutor, () -> {
+                runOnUiThread(() -> {
+                    isProxyEnabled = false;
+                    Toast.makeText(MainActivity.this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
+                    if (webView != null) webView.reload();
+                });
+            });
+        }
+    }
+
+    private void toggleProxy() {
+        if (isProxyEnabled) {
+            setupProxy(false);
+        } else {
+            setupProxy(true);
         }
     }
 
@@ -226,13 +278,6 @@ public class MainActivity extends BridgeActivity {
         ws.setLoadWithOverviewMode(true);
         ws.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // === НАСТРОЙКА ПРОКСИ НА УРОВНЕ ЗАПРОСОВ ===
-        if (isProxyEnabled) {
-            proxy = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 8080));
-        } else {
-            proxy = java.net.Proxy.NO_PROXY;
-        }
-
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
@@ -247,6 +292,10 @@ public class MainActivity extends BridgeActivity {
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
+            // Если прокси включён, активируем его
+            if (isProxyEnabled) {
+                setupProxy(true);
+            }
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
 
@@ -287,19 +336,9 @@ public class MainActivity extends BridgeActivity {
         proxyP.setMargins(0, 0, 20, 40);
         proxyBtn.setLayoutParams(proxyP);
         proxyBtn.setOnClickListener(v -> {
-            isProxyEnabled = !isProxyEnabled;
-            if (isProxyEnabled) {
-                proxy = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 8080));
-                Toast.makeText(this, "🔒 Прокси включён", Toast.LENGTH_SHORT).show();
-            } else {
-                proxy = java.net.Proxy.NO_PROXY;
-                Toast.makeText(this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
-            }
-            // Обновляем иконку
+            toggleProxy();
             proxyBtn.setImageDrawable(createProxyIcon());
             proxyBtn.setBackground(createCircleButtonBackground(isProxyEnabled ? "#4CAF50" : "#FF9800"));
-            // Перезагружаем страницу
-            webView.reload();
         });
 
         mainOverlay.addView(webView);
@@ -362,7 +401,6 @@ public class MainActivity extends BridgeActivity {
         p.setStrokeWidth(6);
         p.setStyle(Paint.Style.STROKE);
 
-        // Рисуем щит
         float cx = 30, cy = 30;
         c.drawLine(cx - 20, cy - 5, cx - 20, cy + 15, p);
         c.drawLine(cx - 20, cy - 5, cx, cy - 15, p);
@@ -371,7 +409,6 @@ public class MainActivity extends BridgeActivity {
         c.drawLine(cx - 20, cy + 15, cx, cy + 25, p);
         c.drawLine(cx + 20, cy + 15, cx, cy + 25, p);
 
-        // Рисуем галочку внутри
         p.setStrokeWidth(4);
         c.drawLine(cx - 8, cy + 2, cx - 2, cy + 10, p);
         c.drawLine(cx - 2, cy + 10, cx + 10, cy - 6, p);
@@ -425,6 +462,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        // Очищаем прокси при закрытии
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            ProxyController.getInstance().clearProxyOverride(mainExecutor, () -> {});
+        }
         if (mainCircle != null && windowManager != null) {
             windowManager.removeView(mainCircle);
         }
@@ -447,4 +488,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-                                       }
+}
