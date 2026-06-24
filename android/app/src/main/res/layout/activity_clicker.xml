@@ -6,7 +6,6 @@
     android:background="#1A1A2E"
     android:padding="20dp">
 
-    <!-- Заголовок -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,7 +16,6 @@
         android:gravity="center"
         android:padding="20dp"/>
 
-    <!-- Статус (количество точек) -->
     <TextView
         android:id="@+id/tvPointsCount"
         android:layout_width="match_parent"
@@ -28,7 +26,6 @@
         android:gravity="center"
         android:padding="10dp"/>
 
-    <!-- Поле для ввода интервала -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -57,7 +54,6 @@
             android:padding="10dp"/>
     </LinearLayout>
 
-    <!-- Сетка кнопок -->
     <GridLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -97,7 +93,6 @@
             android:layout_margin="5dp"/>
     </GridLayout>
 
-    <!-- Список точек (для отображения) -->
     <TextView
         android:id="@+id/tvPointsList"
         android:layout_width="match_parent"
