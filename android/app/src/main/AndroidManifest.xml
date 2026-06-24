@@ -2,19 +2,27 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.voice.app">
 
+    <!-- ОСНОВНЫЕ РАЗРЕШЕНИЯ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- МИКРОФОН И КАМЕРА -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
+    <!-- ФОНОВАЯ РАБОТА -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- ХРАНИЛИЩЕ -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    
+    <!-- ПЛАВАЮЩИЕ ОКНА И АВТОКЛИКЕР -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
 
@@ -28,6 +36,7 @@
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true">
 
+        <!-- ГЛАВНАЯ АКТИВНОСТЬ -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -42,11 +51,25 @@
             </intent-filter>
         </activity>
 
+        <!-- АВТОКЛИКЕР (отдельное окно) -->
+        <activity
+            android:name=".ClickerActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:exported="false" />
+
+        <!-- ЗАПИСЬ ЭКРАНА (отдельное окно) -->
+        <activity
+            android:name=".RecordActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:exported="false" />
+
+        <!-- СЕРВИС ЗАПИСИ ЭКРАНА -->
         <service
             android:name=".ScreenRecordService"
             android:foregroundServiceType="mediaProjection"
             android:exported="false" />
 
+        <!-- СЕРВИС АВТОКЛИКЕРА (Accessibility) -->
         <service
             android:name=".ClickAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -61,6 +84,7 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
+        <!-- СЕРВИСЫ ДЛЯ ГОЛОСА -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
@@ -71,6 +95,7 @@
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
+        <!-- ПРОВАЙДЕР ДЛЯ ФАЙЛОВ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
