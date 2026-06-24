@@ -6,19 +6,24 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- МИКРОФОН И КАМЕРА -->
+    <!-- МИКРОФОН -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    
+    <!-- КАМЕРА -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
-    <!-- ФОНОВАЯ РАБОТА -->
+    <!-- ФОНОВАЯ РАБОТА (ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 14+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <!-- ХРАНИЛИЩЕ -->
+    <!-- УВЕДОМЛЕНИЯ (ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- ДОПОЛНИТЕЛЬНЫЕ РАЗРЕШЕНИЯ -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
@@ -51,13 +56,13 @@
             </intent-filter>
         </activity>
 
-        <!-- АВТОКЛИКЕР (отдельное окно) -->
+        <!-- АВТОКЛИКЕР -->
         <activity
             android:name=".ClickerActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
 
-        <!-- ЗАПИСЬ ЭКРАНА (отдельное окно) -->
+        <!-- ЗАПИСЬ ЭКРАНА -->
         <activity
             android:name=".RecordActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
@@ -84,12 +89,13 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
-        <!-- СЕРВИСЫ ДЛЯ ГОЛОСА -->
+        <!-- СЕРВИС ДЛЯ ГОЛОСОВОГО ЧАТА (С МИКРОФОНОМ) -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
+        <!-- СЕРВИС CAPACITOR ДЛЯ СОВМЕСТИМОСТИ -->
         <service
             android:name="com.getcapacitor.CapacitorForegroundService"
             android:foregroundServiceType="microphone"
