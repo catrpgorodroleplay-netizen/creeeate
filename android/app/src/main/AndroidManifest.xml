@@ -42,13 +42,11 @@
             </intent-filter>
         </activity>
 
-        <!-- СЕРВИС ЗАПИСИ ЭКРАНА -->
         <service
             android:name=".ScreenRecordService"
             android:foregroundServiceType="mediaProjection"
             android:exported="false" />
 
-        <!-- СЕРВИС АВТОКЛИКЕРА -->
         <service
             android:name=".ClickAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
