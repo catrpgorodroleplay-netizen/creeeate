@@ -33,6 +33,9 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
@@ -51,6 +54,10 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
+
+    // === ПРОКСИ ===
+    private LocalProxyServer proxyServer;
+    private boolean isProxyEnabled = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -88,6 +95,9 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+
+        // === ЗАПУСК ПРОКСИ ПРИ СТАРТЕ ===
+        startProxy();
     }
 
     private void requestPermissionsIfNeeded() {
@@ -107,6 +117,34 @@ public class MainActivity extends BridgeActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
+        }
+    }
+
+    // ===== ЗАПУСК ПРОКСИ =====
+    private void startProxy() {
+        if (proxyServer == null) {
+            proxyServer = new LocalProxyServer();
+        }
+        if (!proxyServer.isRunning()) {
+            proxyServer.start();
+            isProxyEnabled = true;
+            Toast.makeText(this, "🔒 Прокси включён (localhost:8080)", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopProxy() {
+        if (proxyServer != null && proxyServer.isRunning()) {
+            proxyServer.stop();
+            isProxyEnabled = false;
+            Toast.makeText(this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void toggleProxy() {
+        if (isProxyEnabled) {
+            stopProxy();
+        } else {
+            startProxy();
         }
     }
 
@@ -219,6 +257,11 @@ public class MainActivity extends BridgeActivity {
         ws.setLoadWithOverviewMode(true);
         ws.setJavaScriptCanOpenWindowsAutomatically(true);
 
+        // === НАСТРОЙКА ПРОКСИ ДЛЯ WEBVIEW ===
+        if (isProxyEnabled) {
+            ws.setProxy("127.0.0.1", 8080);
+        }
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
@@ -240,7 +283,7 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Кнопка ЗАКРЫТЬ (крестик)
+        // Кнопка ЗАКРЫТЬ
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -252,7 +295,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // Кнопка СВЕРНУТЬ (зелёная, сохраняет состояние)
+        // Кнопка СВЕРНУТЬ
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
         FrameLayout.LayoutParams minP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
         minP.setMargins(0, 40, 20, 0);
@@ -267,9 +310,27 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
+        // === НОВАЯ КНОПКА: ВКЛ/ВЫКЛ ПРОКСИ ===
+        ImageButton proxyBtn = createCircleButton(createProxyIcon(), isProxyEnabled ? "#4CAF50" : "#FF9800");
+        FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
+        proxyP.setMargins(0, 0, 20, 40);
+        proxyBtn.setLayoutParams(proxyP);
+        proxyBtn.setOnClickListener(v -> {
+            toggleProxy();
+            // Обновляем иконку и цвет кнопки
+            proxyBtn.setImageDrawable(createProxyIcon());
+            proxyBtn.setBackground(createCircleButtonBackground(isProxyEnabled ? "#4CAF50" : "#FF9800"));
+            // Перезагружаем WebView с новыми настройками
+            if (webView != null) {
+                webView.getSettings().setProxy(isProxyEnabled ? "127.0.0.1" : null, isProxyEnabled ? 8080 : 0);
+                webView.reload();
+            }
+        });
+
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
+        mainOverlay.addView(proxyBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -303,14 +364,44 @@ public class MainActivity extends BridgeActivity {
     private ImageButton createCircleButton(Drawable icon, String color) {
         ImageButton btn = new ImageButton(this);
         btn.setImageDrawable(icon);
+        btn.setBackground(createCircleButtonBackground(color));
+        btn.setPadding(20, 20, 20, 20);
+        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        return btn;
+    }
+
+    private GradientDrawable createCircleButtonBackground(String color) {
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);
         d.setColor(Color.parseColor(color));
         d.setStroke(4, Color.WHITE);
-        btn.setBackground(d);
-        btn.setPadding(20, 20, 20, 20);
-        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        return btn;
+        return d;
+    }
+
+    private Drawable createProxyIcon() {
+        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStrokeWidth(6);
+        p.setStyle(Paint.Style.STROKE);
+
+        // Рисуем щит
+        float cx = 30, cy = 30;
+        c.drawLine(cx - 20, cy - 5, cx - 20, cy + 15, p);
+        c.drawLine(cx - 20, cy - 5, cx, cy - 15, p);
+        c.drawLine(cx + 20, cy - 5, cx, cy - 15, p);
+        c.drawLine(cx + 20, cy - 5, cx + 20, cy + 15, p);
+        c.drawLine(cx - 20, cy + 15, cx, cy + 25, p);
+        c.drawLine(cx + 20, cy + 15, cx, cy + 25, p);
+
+        // Рисуем галочку внутри
+        p.setStrokeWidth(4);
+        c.drawLine(cx - 8, cy + 2, cx - 2, cy + 10, p);
+        c.drawLine(cx - 2, cy + 10, cx + 10, cy - 6, p);
+
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
     private Drawable createCloseIcon() {
@@ -357,6 +448,18 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopProxy();
+        if (mainCircle != null && windowManager != null) {
+            windowManager.removeView(mainCircle);
+        }
+        if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
+            windowManager.removeView(mainOverlay);
+        }
+    }
+
+    @Override
     public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
         if (code == REQUEST_MICROPHONE && results.length > 0) {
@@ -370,15 +473,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (mainCircle != null && windowManager != null) {
-            windowManager.removeView(mainCircle);
-        }
-        if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
-            windowManager.removeView(mainOverlay);
-        }
-    }
-            }
+                   }
