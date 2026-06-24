@@ -2,6 +2,7 @@ package com.voice.app;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -36,7 +37,6 @@ import com.getcapacitor.BridgeActivity;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-// Импорты для ProxyController
 import androidx.webkit.WebViewFeature;
 import androidx.webkit.ProxyController;
 import androidx.webkit.ProxyConfig;
@@ -59,6 +59,8 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
+
+    // === ПРОКСИ ===
     private boolean isProxyEnabled = false;
     private final Executor mainExecutor = Executors.newSingleThreadExecutor();
 
@@ -119,33 +121,41 @@ public class MainActivity extends BridgeActivity {
     // ===== ПРОКСИ =====
     private void setupProxy(boolean enable) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            Toast.makeText(this, "Прокси не поддерживается", Toast.LENGTH_SHORT).show();
             return;
         }
 
         ProxyController proxyController = ProxyController.getInstance();
 
         if (enable) {
+            SharedPreferences prefs = getSharedPreferences("proxy_settings", MODE_PRIVATE);
+            ProxySettingsActivity.ProxyData proxy = ProxySettingsActivity.getProxySettings(prefs);
+
+            if (proxy == null) {
+                Toast.makeText(this, "❌ Нет сохранённого прокси", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            String proxyRule = proxy.server + ":" + proxy.port;
+            isProxyEnabled = true;
+
             proxyController.clearProxyOverride(mainExecutor, () -> {
-                // Простая конфигурация — только один прокси
                 ProxyConfig proxyConfig = new ProxyConfig.Builder()
-                        .addProxyRule("127.0.0.1:8080")
+                        .addProxyRule(proxyRule)
                         .addBypassRule("localhost")
                         .addBypassRule("127.0.0.1")
                         .build();
 
                 proxyController.setProxyOverride(proxyConfig, mainExecutor, () -> {
                     runOnUiThread(() -> {
-                        isProxyEnabled = true;
-                        Toast.makeText(MainActivity.this, "🔒 Прокси включён", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "🔒 Прокси включён: " + proxyRule, Toast.LENGTH_SHORT).show();
                         if (webView != null) webView.reload();
                     });
                 });
             });
         } else {
+            isProxyEnabled = false;
             proxyController.clearProxyOverride(mainExecutor, () -> {
                 runOnUiThread(() -> {
-                    isProxyEnabled = false;
                     Toast.makeText(MainActivity.this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
                     if (webView != null) webView.reload();
                 });
@@ -157,6 +167,13 @@ public class MainActivity extends BridgeActivity {
         if (isProxyEnabled) {
             setupProxy(false);
         } else {
+            setupProxy(true);
+        }
+    }
+
+    private void applyProxyOnStart() {
+        SharedPreferences prefs = getSharedPreferences("proxy_settings", MODE_PRIVATE);
+        if (prefs.getBoolean("enabled", false)) {
             setupProxy(true);
         }
     }
@@ -284,6 +301,8 @@ public class MainActivity extends BridgeActivity {
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
+            // Применяем прокси при загрузке
+            applyProxyOnStart();
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
 
@@ -318,10 +337,20 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // КНОПКА ПРОКСИ
+        // КНОПКА НАСТРОЕК ПРОКСИ (шестерёнка)
+        ImageButton settingsBtn = createCircleButton(createSettingsIcon(), "#2196F3");
+        FrameLayout.LayoutParams settingsP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
+        settingsP.setMargins(0, 0, 20, 120);
+        settingsBtn.setLayoutParams(settingsP);
+        settingsBtn.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, ProxySettingsActivity.class);
+            startActivity(intent);
+        });
+
+        // КНОПКА ВКЛ/ВЫКЛ ПРОКСИ
         ImageButton proxyBtn = createCircleButton(createProxyIcon(), isProxyEnabled ? "#4CAF50" : "#FF9800");
-        FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
-        proxyP.setMargins(0, 0, 20, 40);
+        FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
+        proxyP.setMargins(20, 0, 0, 120);
         proxyBtn.setLayoutParams(proxyP);
         proxyBtn.setOnClickListener(v -> {
             toggleProxy();
@@ -332,6 +361,7 @@ public class MainActivity extends BridgeActivity {
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
+        mainOverlay.addView(settingsBtn);
         mainOverlay.addView(proxyBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
@@ -378,6 +408,30 @@ public class MainActivity extends BridgeActivity {
         d.setColor(Color.parseColor(color));
         d.setStroke(4, Color.WHITE);
         return d;
+    }
+
+    private Drawable createSettingsIcon() {
+        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStrokeWidth(4);
+        p.setStyle(Paint.Style.STROKE);
+
+        float cx = 30, cy = 30;
+        c.drawCircle(cx, cy, 16, p);
+        p.setStrokeWidth(6);
+        for (int i = 0; i < 8; i++) {
+            double angle = i * Math.PI / 4;
+            float x1 = cx + (float)(22 * Math.cos(angle));
+            float y1 = cy + (float)(22 * Math.sin(angle));
+            float x2 = cx + (float)(28 * Math.cos(angle));
+            float y2 = cy + (float)(28 * Math.sin(angle));
+            c.drawLine(x1, y1, x2, y2, p);
+        }
+
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
     private Drawable createProxyIcon() {
@@ -475,4 +529,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-                }
+            }
