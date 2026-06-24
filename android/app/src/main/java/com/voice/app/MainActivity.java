@@ -1,10 +1,6 @@
 package com.voice.app;
 
 import android.Manifest;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -35,7 +31,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -47,8 +42,6 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    private static final String CHANNEL_ID = "voice_channel";
-    private static final int NOTIFICATION_ID = 1;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -68,17 +61,14 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // === СНАЧАЛА ПРОВЕРЯЕМ РАЗРЕШЕНИЯ ===
         checkAndRequestPermissions();
 
-        // === WAKE LOCK (чтобы телефон не засыпал) ===
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         if (pm != null) {
             PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyApp::WakeLock");
             wakeLock.acquire(10 * 60 * 1000L);
         }
 
-        // === ОВЕРЛЕЙ ===
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -91,7 +81,6 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // === WEBVIEW ===
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -105,69 +94,31 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ПРОВЕРКА РАЗРЕШЕНИЙ =====
     private void checkAndRequestPermissions() {
         ArrayList<String> permissions = new ArrayList<>();
-
-        // Микрофон
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.RECORD_AUDIO);
         } else {
             hasMicrophonePermission = true;
         }
-
-        // Камера
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA);
         }
-
-        // Уведомления (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS);
             }
         }
-
         if (!permissions.isEmpty()) {
             ActivityCompat.requestPermissions(this,
                     permissions.toArray(new String[0]),
                     REQUEST_MICROPHONE);
-        } else {
-            // Если все разрешения уже есть — запускаем сервис
-            startVoiceService();
         }
     }
 
-    private void startVoiceService() {
-        if (hasMicrophonePermission) {
-            createNotificationChannel();
-            Intent intent = new Intent(this, VoiceForegroundService.class);
-            ContextCompat.startForegroundService(this, intent);
-        } else {
-            // Если микрофон не разрешён — просто показываем тост
-            Toast.makeText(this, "Микрофон не разрешён, голосовой чат не будет работать", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Голосовой чат",
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Приложение работает в фоне");
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
-        }
-    }
-
-    // ===== КРУЖОК =====
     private void createMainCircle() {
         int flag = getOverlayFlag();
         mainCircle = new ImageButton(this);
@@ -231,7 +182,6 @@ public class MainActivity extends BridgeActivity {
         paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(6);
-
         float cx = size / 2f, cy = size / 2f;
         canvas.drawRoundRect(cx - 32, cy - 22, cx + 32, cy + 22, 18, 18, paint);
         canvas.drawCircle(cx - 25, cy, 12, paint);
@@ -317,7 +267,6 @@ public class MainActivity extends BridgeActivity {
             if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
         });
 
-        // ===== ТРИ КНОПКИ ВНИЗУ =====
         LinearLayout bottomButtons = new LinearLayout(this);
         bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
         bottomButtons.setGravity(Gravity.CENTER);
@@ -329,21 +278,21 @@ public class MainActivity extends BridgeActivity {
         bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         bottomButtons.setLayoutParams(bottomP);
 
-        // 1. АВТОКЛИКЕР
+        // 1. АВТОКЛИКЕР (открывает оверлей)
         ImageButton clickerBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
         clickerBtn.setLayoutParams(btnP);
         clickerBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, ClickerActivity.class);
+            Intent intent = new Intent(MainActivity.this, ClickerOverlayActivity.class);
             startActivity(intent);
         });
 
-        // 2. ЗАПИСЬ ЭКРАНА
+        // 2. ЗАПИСЬ ЭКРАНА (открывает оверлей)
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
         recordBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, RecordActivity.class);
+            Intent intent = new Intent(MainActivity.this, RecordOverlayActivity.class);
             startActivity(intent);
         });
 
@@ -506,37 +455,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
-        
         if (code == REQUEST_MICROPHONE) {
-            boolean micGranted = false;
-            
             for (int i = 0; i < perms.length; i++) {
-                if (perms[i].equals(Manifest.permission.RECORD_AUDIO)) {
-                    if (results[i] == PackageManager.PERMISSION_GRANTED) {
-                        micGranted = true;
-                        hasMicrophonePermission = true;
-                        Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-                        // ЗАПУСКАЕМ СЕРВИС ПОСЛЕ РАЗРЕШЕНИЯ!
-                        startVoiceService();
-                    } else {
-                        Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_LONG).show();
-                    }
-                }
-                if (perms[i].equals(Manifest.permission.CAMERA)) {
-                    if (results[i] == PackageManager.PERMISSION_GRANTED) {
-                        Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
-                    }
+                if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
                 }
             }
-            
-            // Если микрофон разрешён, но сервис не запустился
-            if (micGranted) {
-                createNotificationChannel();
-                Intent intent = new Intent(this, VoiceForegroundService.class);
-                ContextCompat.startForegroundService(this, intent);
-            }
+        }
+        if (code == REQUEST_CAMERA && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -550,4 +477,4 @@ public class MainActivity extends BridgeActivity {
             windowManager.removeView(mainOverlay);
         }
     }
-            }
+}
