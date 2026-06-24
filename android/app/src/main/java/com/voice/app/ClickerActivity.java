@@ -210,7 +210,6 @@ public class ClickerActivity extends AppCompatActivity {
             public void run() {
                 runOnUiThread(() -> {
                     if (!isActive || clickPoints.isEmpty()) return;
-                    // Кликаем по очереди
                     ClickPoint point = clickPoints.get(index);
                     ArrayList<ClickPoint> singlePoint = new ArrayList<>();
                     singlePoint.add(point);
@@ -260,10 +259,8 @@ public class ClickerActivity extends AppCompatActivity {
                     windowManager.updateViewLayout(minimizeCircle, params);
                     break;
                 case MotionEvent.ACTION_UP:
-                    // Возвращаем окно
-                    if (!isActive) {
-                        showFullScreen();
-                    }
+                    // Возвращаем окно при нажатии
+                    showFullScreen();
                     break;
             }
             return true;
@@ -271,21 +268,42 @@ public class ClickerActivity extends AppCompatActivity {
 
         windowManager.addView(minimizeCircle, params);
         
-        // Сворачиваем окно
+        // Сворачиваем активность в фон
         moveTaskToBack(true);
-        Toast.makeText(this, "Автокликер свернут в кружок", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Автокликер свернут в кружок. Нажмите на кружок для возврата.", Toast.LENGTH_SHORT).show();
     }
 
     private void showFullScreen() {
-        if (minimizeCircle != null) {
-            windowManager.removeView(minimizeCircle);
+        if (minimizeCircle != null && windowManager != null) {
+            try {
+                windowManager.removeView(minimizeCircle);
+            } catch (Exception e) {}
             minimizeCircle = null;
         }
         isMinimized = false;
+        
         // Возвращаем активность на передний план
         Intent intent = new Intent(this, ClickerActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         startActivity(intent);
+        
+        // Если автокликер был запущен, продолжаем работу
+        if (isActive) {
+            Toast.makeText(this, "Автокликер продолжает работу", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Если кружок был виден при возврате, убираем его
+        if (isMinimized && minimizeCircle != null) {
+            try {
+                windowManager.removeView(minimizeCircle);
+            } catch (Exception e) {}
+            minimizeCircle = null;
+            isMinimized = false;
+        }
     }
 
     @Override
@@ -305,4 +323,4 @@ public class ClickerActivity extends AppCompatActivity {
             } catch (Exception e) {}
         }
     }
-}
+                }
