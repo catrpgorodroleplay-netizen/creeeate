@@ -13,8 +13,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -61,8 +59,6 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
-
-    // === ПРОКСИ ===
     private boolean isProxyEnabled = false;
     private final Executor mainExecutor = Executors.newSingleThreadExecutor();
 
@@ -120,23 +116,20 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ПРОКСИ ЧЕРЕЗ ProxyController =====
+    // ===== ПРОКСИ =====
     private void setupProxy(boolean enable) {
-        // Проверяем, поддерживается ли прокси на этом устройстве
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            Toast.makeText(this, "Прокси не поддерживается на этом устройстве", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Прокси не поддерживается", Toast.LENGTH_SHORT).show();
             return;
         }
 
         ProxyController proxyController = ProxyController.getInstance();
 
         if (enable) {
-            // Сначала чистим старые настройки
             proxyController.clearProxyOverride(mainExecutor, () -> {
-                // Создаём конфиг: все запросы через прокси 127.0.0.1:8080
+                // Простая конфигурация — только один прокси
                 ProxyConfig proxyConfig = new ProxyConfig.Builder()
-                        .addProxyRule("127.0.0.1:8080", ProxyConfig.HTTP)
-                        .addProxyRule("127.0.0.1:8080", ProxyConfig.HTTPS)
+                        .addProxyRule("127.0.0.1:8080")
                         .addBypassRule("localhost")
                         .addBypassRule("127.0.0.1")
                         .build();
@@ -150,7 +143,6 @@ public class MainActivity extends BridgeActivity {
                 });
             });
         } else {
-            // Выключаем прокси
             proxyController.clearProxyOverride(mainExecutor, () -> {
                 runOnUiThread(() -> {
                     isProxyEnabled = false;
@@ -292,10 +284,6 @@ public class MainActivity extends BridgeActivity {
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
-            // Если прокси включён, активируем его
-            if (isProxyEnabled) {
-                setupProxy(true);
-            }
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
 
@@ -462,7 +450,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Очищаем прокси при закрытии
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             ProxyController.getInstance().clearProxyOverride(mainExecutor, () -> {});
         }
@@ -488,4 +475,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-}
+                }
