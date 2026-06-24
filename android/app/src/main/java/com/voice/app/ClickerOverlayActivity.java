@@ -4,16 +4,20 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -48,8 +52,7 @@ public class ClickerOverlayActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Проверка Accessibility
+
         if (!isAccessibilityServiceEnabled()) {
             new AlertDialog.Builder(this)
                 .setTitle("Включите автокликер")
@@ -72,7 +75,6 @@ public class ClickerOverlayActivity extends AppCompatActivity {
         overlayLayout.setBackgroundColor(Color.parseColor("#DD1A1A2E"));
         overlayLayout.setPadding(20, 20, 20, 20);
 
-        // Создаём UI
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setBackgroundColor(Color.parseColor("#1A1A2E"));
@@ -93,7 +95,6 @@ public class ClickerOverlayActivity extends AppCompatActivity {
         tvPointsCount.setPadding(0, 0, 0, 10);
         mainLayout.addView(tvPointsCount);
 
-        // Интервал
         LinearLayout intervalLayout = new LinearLayout(this);
         intervalLayout.setOrientation(LinearLayout.HORIZONTAL);
         intervalLayout.setPadding(0, 0, 0, 20);
@@ -117,7 +118,6 @@ public class ClickerOverlayActivity extends AppCompatActivity {
 
         mainLayout.addView(intervalLayout);
 
-        // Кнопки
         GridLayout gridLayout = new GridLayout(this);
         gridLayout.setColumnCount(2);
         gridLayout.setPadding(0, 0, 0, 20);
@@ -196,7 +196,6 @@ public class ClickerOverlayActivity extends AppCompatActivity {
         final ClickPoint newPoint = new ClickPoint(500 + (pointId * 30), 400 + (pointId * 20));
         clickPoints.add(newPoint);
 
-        // Визуализация точки
         FrameLayout pointView = new FrameLayout(this);
         pointView.setBackground(ContextCompat.getDrawable(this, R.drawable.circle_point));
         pointView.setPadding(10, 10, 10, 10);
@@ -395,4 +394,4 @@ public class ClickerOverlayActivity extends AppCompatActivity {
             } catch (Exception e) {}
         }
     }
-    }
+}
