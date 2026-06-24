@@ -13,7 +13,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -26,7 +25,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -34,8 +32,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
-
-import java.util.ArrayList;
 
 public class MainActivity extends BridgeActivity {
 
@@ -55,20 +51,15 @@ public class MainActivity extends BridgeActivity {
     private float startX, startY;
     private int initialX, initialY;
     private boolean isDragging = false;
-    private boolean hasMicrophonePermission = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        checkAndRequestPermissions();
+        // Разрешения
+        requestPermissionsIfNeeded();
 
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        if (pm != null) {
-            PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyApp::WakeLock");
-            wakeLock.acquire(10 * 60 * 1000L);
-        }
-
+        // Разрешение на оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -81,6 +72,11 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
+        // Запуск Foreground Service для микрофона
+        Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
+        ContextCompat.startForegroundService(this, serviceIntent);
+
+        // Настройка WebView
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -94,31 +90,27 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void checkAndRequestPermissions() {
-        ArrayList<String> permissions = new ArrayList<>();
+    private void requestPermissionsIfNeeded() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO);
-        } else {
-            hasMicrophonePermission = true;
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.CAMERA);
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS);
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
-        }
-        if (!permissions.isEmpty()) {
-            ActivityCompat.requestPermissions(this,
-                    permissions.toArray(new String[0]),
-                    REQUEST_MICROPHONE);
         }
     }
 
+    // ===== ГЛАВНЫЙ КРУЖОК =====
     private void createMainCircle() {
         int flag = getOverlayFlag();
         mainCircle = new ImageButton(this);
@@ -182,6 +174,7 @@ public class MainActivity extends BridgeActivity {
         paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(6);
+
         float cx = size / 2f, cy = size / 2f;
         canvas.drawRoundRect(cx - 32, cy - 22, cx + 32, cy + 22, 18, 18, paint);
         canvas.drawCircle(cx - 25, cy, 12, paint);
@@ -196,6 +189,7 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
+    // ===== ОВЕРЛЕЙ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -246,15 +240,19 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
+        // Кнопка ЗАКРЫТЬ (крестик)
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
         closeBtn.setLayoutParams(closeP);
         closeBtn.setOnClickListener(v -> {
             hideMainOverlay();
-            if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
+            if (mainCircle != null) {
+                mainCircle.setVisibility(View.VISIBLE);
+            }
         });
 
+        // Кнопка СВЕРНУТЬ (зелёная, сохраняет состояние)
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
         FrameLayout.LayoutParams minP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
         minP.setMargins(0, 40, 20, 0);
@@ -264,58 +262,14 @@ public class MainActivity extends BridgeActivity {
             webView.saveState(bundle);
             webViewState = bundle;
             hideMainOverlay();
-            if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
-        });
-
-        LinearLayout bottomButtons = new LinearLayout(this);
-        bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
-        bottomButtons.setGravity(Gravity.CENTER);
-        bottomButtons.setPadding(20, 10, 20, 30);
-
-        FrameLayout.LayoutParams bottomP = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        bottomButtons.setLayoutParams(bottomP);
-
-        // 1. АВТОКЛИКЕР (открывает оверлей)
-        ImageButton clickerBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
-        LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
-        btnP.setMargins(20, 0, 20, 0);
-        clickerBtn.setLayoutParams(btnP);
-        clickerBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, ClickerOverlayActivity.class);
-            startActivity(intent);
-        });
-
-        // 2. ЗАПИСЬ ЭКРАНА (открывает оверлей)
-        ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
-        recordBtn.setLayoutParams(btnP);
-        recordBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, RecordOverlayActivity.class);
-            startActivity(intent);
-        });
-
-        // 3. КОРЗИНА
-        ImageButton trashBtn = createCircleButton(createTrashIcon(), "#880E4F");
-        trashBtn.setLayoutParams(btnP);
-        trashBtn.setOnClickListener(v -> {
-            hideMainOverlay();
-            if (mainCircle != null && windowManager != null) {
-                windowManager.removeView(mainCircle);
-                mainCircle = null;
+            if (mainCircle != null) {
+                mainCircle.setVisibility(View.VISIBLE);
             }
-            finishAffinity();
         });
-
-        bottomButtons.addView(clickerBtn);
-        bottomButtons.addView(recordBtn);
-        bottomButtons.addView(trashBtn);
 
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
-        mainOverlay.addView(bottomButtons);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -339,6 +293,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
     private int getOverlayFlag() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
@@ -356,57 +311,6 @@ public class MainActivity extends BridgeActivity {
         btn.setPadding(20, 20, 20, 20);
         btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         return btn;
-    }
-
-    private Drawable createAutoClickerIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.WHITE);
-        p.setStrokeWidth(5);
-        p.setStyle(Paint.Style.STROKE);
-        c.drawCircle(20, 30, 10, p);
-        c.drawCircle(40, 30, 10, p);
-        c.drawLine(20, 40, 40, 40, p);
-        c.drawLine(30, 15, 30, 25, p);
-        p.setStyle(Paint.Style.FILL);
-        c.drawCircle(30, 15, 3, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
-    }
-
-    private Drawable createRecordIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.RED);
-        p.setStyle(Paint.Style.FILL);
-        c.drawCircle(30, 30, 20, p);
-        p.setColor(Color.WHITE);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(3);
-        c.drawCircle(30, 30, 22, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
-    }
-
-    private Drawable createTrashIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.WHITE);
-        p.setStrokeWidth(5);
-        p.setStyle(Paint.Style.STROKE);
-        c.drawRect(18, 22, 42, 48, p);
-        c.drawLine(22, 16, 38, 16, p);
-        c.drawLine(22, 16, 25, 22, p);
-        c.drawLine(38, 16, 35, 22, p);
-        c.drawLine(16, 22, 44, 22, p);
-        c.drawLine(24, 28, 24, 42, p);
-        c.drawLine(30, 28, 30, 42, p);
-        c.drawLine(36, 28, 36, 42, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
     private Drawable createCloseIcon() {
@@ -455,15 +359,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
-        if (code == REQUEST_MICROPHONE) {
-            for (int i = 0; i < perms.length; i++) {
-                if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-                }
+        if (code == REQUEST_MICROPHONE && results.length > 0) {
+            if (results[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
             }
         }
-        if (code == REQUEST_CAMERA && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+        if (code == REQUEST_CAMERA && results.length > 0) {
+            if (results[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
