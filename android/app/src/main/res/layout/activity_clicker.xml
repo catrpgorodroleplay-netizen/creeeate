@@ -85,20 +85,32 @@
             android:layout_margin="5dp"/>
 
         <Button
+            android:id="@+id/btnMinimize"
+            android:text="⏺ СВЕРНУТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#FF9800"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
             android:id="@+id/btnClose"
             android:text="✕ ЗАКРЫТЬ"
             android:textColor="#FFFFFF"
             android:background="#555555"
             android:padding="15dp"
-            android:layout_margin="5dp"/>
+            android:layout_margin="5dp"
+            android:layout_columnSpan="2"
+            android:layout_gravity="fill_horizontal"/>
+
     </GridLayout>
 
     <TextView
         android:id="@+id/tvPointsList"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Точки:"
+        android:text="Точки (по порядку):"
         android:textColor="#AAAAAA"
-        android:padding="10dp"/>
+        android:padding="10dp"
+        android:layout_marginTop="10dp"/>
 
 </LinearLayout>
