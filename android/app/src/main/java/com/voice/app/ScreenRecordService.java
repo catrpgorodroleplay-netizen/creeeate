@@ -7,8 +7,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ContentValues;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.MediaRecorder;
@@ -39,7 +37,7 @@ public class ScreenRecordService extends Service {
     private static final String CHANNEL_ID = "screen_record_channel";
     private static final int NOTIFICATION_ID = 2001;
     private static final String TAG = "ScreenRecordService";
-    
+
     public static boolean isRunning = false;
     public static int delaySeconds = 0;
 
@@ -91,7 +89,7 @@ public class ScreenRecordService extends Service {
 
             File movieDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
             if (!movieDir.exists()) movieDir.mkdirs();
-            
+
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             recordFilePath = new File(movieDir, "REC_" + timeStamp + ".mp4").getAbsolutePath();
 
@@ -118,10 +116,9 @@ public class ScreenRecordService extends Service {
             isRunning = true;
             recordSeconds = 0;
             startTimer();
-            
-            // Показываем уведомление
+
             startForeground(NOTIFICATION_ID, createNotification("⏺ Запись экрана", "Идёт запись..."));
-            
+
             Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
             Log.e(TAG, "Ошибка записи: " + e.getMessage());
@@ -155,7 +152,6 @@ public class ScreenRecordService extends Service {
             Log.e(TAG, "Ошибка остановки записи: " + e.getMessage());
         }
 
-        // Сохраняем в галерею
         if (recordFilePath != null && !recordFilePath.isEmpty()) {
             saveToGallery();
         }
@@ -236,4 +232,4 @@ public class ScreenRecordService extends Service {
         super.onDestroy();
         stopRecording();
     }
-                  }
+}
