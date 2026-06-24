@@ -12,6 +12,10 @@ public class ClickAccessibilityService extends AccessibilityService {
 
     private static ClickAccessibilityService instance;
 
+    public static boolean isServiceRunning() {
+        return instance != null;
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {}
 
