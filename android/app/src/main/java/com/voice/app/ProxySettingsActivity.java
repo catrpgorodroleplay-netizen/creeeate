@@ -1,6 +1,5 @@
 package com.voice.app;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
@@ -8,12 +7,11 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 public class ProxySettingsActivity extends AppCompatActivity {
 
     private EditText etServer, etPort, etSecret;
-    private Button btnSave, btnClear, btnStatus;
+    private Button btnSave, btnClear;
     private SharedPreferences prefs;
 
     @Override
@@ -28,14 +26,11 @@ public class ProxySettingsActivity extends AppCompatActivity {
         etSecret = findViewById(R.id.etProxySecret);
         btnSave = findViewById(R.id.btnSaveProxy);
         btnClear = findViewById(R.id.btnClearProxy);
-        btnStatus = findViewById(R.id.btnProxyStatus);
 
         loadProxySettings();
-        updateStatusButton();
 
         btnSave.setOnClickListener(v -> saveProxySettings());
         btnClear.setOnClickListener(v -> clearProxySettings());
-        btnStatus.setOnClickListener(v -> toggleProxy());
     }
 
     private void loadProxySettings() {
@@ -61,6 +56,7 @@ public class ProxySettingsActivity extends AppCompatActivity {
             return;
         }
 
+        // Обрезаем секрет до 32 символов
         if (secret.length() > 32) {
             secret = secret.substring(0, 32);
             etSecret.setText(secret);
@@ -79,14 +75,7 @@ public class ProxySettingsActivity extends AppCompatActivity {
         editor.putBoolean("enabled", true);
         editor.apply();
 
-        // Останавливаем старый прокси
-        stopProxyService();
-
-        // Запускаем новый
-        startProxyService(server, Integer.parseInt(port), secret);
-
-        Toast.makeText(this, "✅ Прокси сохранён и запущен", Toast.LENGTH_SHORT).show();
-        updateStatusButton();
+        Toast.makeText(this, "✅ Прокси сохранён", Toast.LENGTH_SHORT).show();
         finish();
     }
 
@@ -94,58 +83,27 @@ public class ProxySettingsActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = prefs.edit();
         editor.clear();
         editor.apply();
-
         etServer.setText("");
         etPort.setText("");
         etSecret.setText("");
-
-        stopProxyService();
-
         Toast.makeText(this, "🗑 Прокси удалён", Toast.LENGTH_SHORT).show();
-        updateStatusButton();
     }
 
-    private void startProxyService(String host, int port, String secret) {
-        Intent intent = new Intent(this, LittleProxyService.class);
-        intent.setAction("START");
-        intent.putExtra("host", host);
-        intent.putExtra("port", port);
-        intent.putExtra("secret", secret);
-        ContextCompat.startForegroundService(this, intent);
-    }
-
-    private void stopProxyService() {
-        Intent intent = new Intent(this, LittleProxyService.class);
-        intent.setAction("STOP");
-        startService(intent);
-    }
-
-    private void toggleProxy() {
-        if (LittleProxyService.isRunning) {
-            stopProxyService();
-            Toast.makeText(this, "🔓 Прокси остановлен", Toast.LENGTH_SHORT).show();
-        } else {
-            String server = prefs.getString("server", "");
-            String port = prefs.getString("port", "");
-            String secret = prefs.getString("secret", "");
-            if (server.isEmpty() || port.isEmpty() || secret.isEmpty()) {
-                Toast.makeText(this, "❌ Сначала сохраните настройки прокси", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            startProxyService(server, Integer.parseInt(port), secret);
-            Toast.makeText(this, "🔒 Прокси запущен", Toast.LENGTH_SHORT).show();
+    // СТАТИЧЕСКИЙ МЕТОД ДЛЯ ПОЛУЧЕНИЯ НАСТРОЕК
+    public static ProxyData getProxySettings(SharedPreferences prefs) {
+        if (!prefs.getBoolean("enabled", false)) {
+            return null;
         }
-        updateStatusButton();
-    }
 
-    private void updateStatusButton() {
-        if (LittleProxyService.isRunning) {
-            btnStatus.setText("⏹ ОСТАНОВИТЬ ПРОКСИ");
-            btnStatus.setBackgroundColor(0xFFE53935);
-        } else {
-            btnStatus.setText("▶ ЗАПУСТИТЬ ПРОКСИ");
-            btnStatus.setBackgroundColor(0xFF4CAF50);
+        String server = prefs.getString("server", "");
+        String port = prefs.getString("port", "");
+        String secret = prefs.getString("secret", "");
+
+        if (server.isEmpty() || port.isEmpty() || secret.isEmpty()) {
+            return null;
         }
+
+        return new ProxyData(server, port, secret);
     }
 
     public static class ProxyData {
@@ -159,4 +117,4 @@ public class ProxySettingsActivity extends AppCompatActivity {
             this.secret = secret;
         }
     }
-                }
+}
