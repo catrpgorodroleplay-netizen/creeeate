@@ -18,7 +18,14 @@
     <!-- ФОНОВАЯ РАБОТА -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- ХРАНИЛИЩЕ (для записи экрана) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     
     <!-- ПЛАВАЮЩЕЕ ОКНО -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -30,7 +37,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true">
 
         <activity
             android:name=".MainActivity"
@@ -48,17 +56,19 @@
 
         </activity>
 
-        <!-- ФОНОВЫЙ СЕРВИС -->
+        <!-- ФОНОВЫЙ СЕРВИС ДЛЯ МИКРОФОНА -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
+        <!-- СЕРВИС CAPACITOR ДЛЯ СОВМЕСТИМОСТИ -->
         <service
             android:name="com.getcapacitor.CapacitorForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
+        <!-- ПРОВАЙДЕР ДЛЯ ФАЙЛОВ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
