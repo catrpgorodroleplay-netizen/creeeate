@@ -87,7 +87,7 @@ public class MainActivity extends BridgeActivity {
     private MediaProjectionManager projectionManager;
     private Intent screenRecordIntent;
 
-    // ===== ВНУТРЕННИЙ КЛАСС ДЛЯ ТОЧЕК =====
+    // ===== ВНУТРЕННИЙ КЛАСС =====
     public static class ClickPoint {
         public float x, y;
         public int id;
@@ -104,21 +104,19 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // ===== РАЗРЕШЕНИЯ =====
-        // Микрофон
+        // Разрешения
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
         }
-        // Камера
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
         }
 
-        // Разрешение на оверлей (плавающие окна)
+        // Оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -131,10 +129,7 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // Проверка Accessibility для автокликера (НО НЕ БЛОКИРУЕТ ЗАПУСК)
-        checkAccessibilityPermission();
-
-        // Запуск Foreground Service для голоса
+        // Запуск сервиса для голоса
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
 
@@ -155,14 +150,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ПРОВЕРКА ACCESSIBILITY =====
-    private void checkAccessibilityPermission() {
-        if (!isAccessibilityServiceEnabled()) {
-            // Просто предупреждаем, но НЕ БЛОКИРУЕМ
-            Toast.makeText(this, "Для автокликера включите его в настройках специальных возможностей", Toast.LENGTH_LONG).show();
-        }
-    }
-
+    // ===== ПРОВЕРКА ACCESSIBILITY (БЕЗОПАСНАЯ) =====
     private boolean isAccessibilityServiceEnabled() {
         String service = getPackageName() + "/" + ClickAccessibilityService.class.getCanonicalName();
         try {
@@ -354,7 +342,13 @@ public class MainActivity extends BridgeActivity {
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
         autoBtn.setLayoutParams(btnP);
-        autoBtn.setOnClickListener(v -> showAutoClickerCircle());
+        autoBtn.setOnClickListener(v -> {
+            if (!isAccessibilityServiceEnabled()) {
+                requestAccessibilityPermission();
+            } else {
+                showAutoClickerCircle();
+            }
+        });
 
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
@@ -447,10 +441,6 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!isDragging) {
-                        if (!isAccessibilityServiceEnabled()) {
-                            requestAccessibilityPermission();
-                            return true;
-                        }
                         showAutoClickerMenu();
                     }
                     return true;
@@ -1013,9 +1003,8 @@ public class MainActivity extends BridgeActivity {
             }
         }
         if (requestCode == REQUEST_ACCESSIBILITY) {
-            // Проверяем, включил ли пользователь
             if (isAccessibilityServiceEnabled()) {
-                Toast.makeText(this, "Автокликер включен!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "✅ Автокликер включен!", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -1062,4 +1051,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-                           }
+    }
