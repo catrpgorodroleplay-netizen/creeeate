@@ -2,6 +2,7 @@ package com.voice.app;
 
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -12,16 +13,19 @@ import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+
+import com.voice.app.ClickAccessibilityService.ClickPoint;
+
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
-
-import com.voice.app.ClickAccessibilityService.ClickPoint;
 
 public class ClickerActivity extends AppCompatActivity {
 
@@ -30,11 +34,13 @@ public class ClickerActivity extends AppCompatActivity {
     private boolean isActive = false;
     private Timer clickTimer;
     private int interval = 1000;
+    private boolean isMinimized = false;
+    private View minimizeCircle;
 
     private TextView tvPointsCount, tvPointsList;
     private EditText etInterval;
     private Spinner spinnerUnit;
-    private Button btnAddPoint, btnClearPoints, btnStartStop, btnClose;
+    private Button btnAddPoint, btnClearPoints, btnStartStop, btnMinimize, btnClose;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +61,7 @@ public class ClickerActivity extends AppCompatActivity {
         btnAddPoint = findViewById(R.id.btnAddPoint);
         btnClearPoints = findViewById(R.id.btnClearPoints);
         btnStartStop = findViewById(R.id.btnStartStop);
+        btnMinimize = findViewById(R.id.btnMinimize);
         btnClose = findViewById(R.id.btnClose);
 
         String[] units = {"Миллисекунды", "Секунды", "Минуты"};
@@ -66,6 +73,7 @@ public class ClickerActivity extends AppCompatActivity {
         btnAddPoint.setOnClickListener(v -> addClickPoint());
         btnClearPoints.setOnClickListener(v -> clearAllPoints());
         btnStartStop.setOnClickListener(v -> toggleClicker());
+        btnMinimize.setOnClickListener(v -> minimizeToCircle());
         btnClose.setOnClickListener(v -> finish());
     }
 
@@ -91,12 +99,22 @@ public class ClickerActivity extends AppCompatActivity {
     }
 
     private void addClickPoint() {
-        final ClickPoint newPoint = new ClickPoint(500, 500);
+        final int pointId = clickPoints.size() + 1;
+        final ClickPoint newPoint = new ClickPoint(500 + (pointId * 30), 400 + (pointId * 20));
         clickPoints.add(newPoint);
 
-        View pointView = new View(this);
-        pointView.setBackgroundColor(0xFFFF0000);
-        
+        // Кружок с номером
+        FrameLayout pointView = new FrameLayout(this);
+        pointView.setBackground(ContextCompat.getDrawable(this, R.drawable.circle_point));
+        pointView.setPadding(10, 10, 10, 10);
+
+        TextView numText = new TextView(this);
+        numText.setText(String.valueOf(pointId));
+        numText.setTextColor(Color.WHITE);
+        numText.setTextSize(16);
+        numText.setPadding(8, 4, 8, 4);
+        pointView.addView(numText);
+
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 60, 60,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -104,8 +122,8 @@ public class ClickerActivity extends AppCompatActivity {
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 500;
-        params.y = 500;
+        params.x = 500 + (pointId * 30);
+        params.y = 400 + (pointId * 20);
 
         pointView.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
@@ -116,6 +134,9 @@ public class ClickerActivity extends AppCompatActivity {
                     newPoint.y = event.getRawY();
                     windowManager.updateViewLayout(pointView, params);
                     break;
+                case MotionEvent.ACTION_UP:
+                    Toast.makeText(this, "Точка " + pointId + " перемещена", Toast.LENGTH_SHORT).show();
+                    break;
             }
             return true;
         });
@@ -123,7 +144,7 @@ public class ClickerActivity extends AppCompatActivity {
         windowManager.addView(pointView, params);
         newPoint.view = pointView;
         updateUI();
-        Toast.makeText(this, "Точка " + clickPoints.size() + " добавлена", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Точка " + pointId + " добавлена", Toast.LENGTH_SHORT).show();
     }
 
     private void clearAllPoints() {
@@ -139,7 +160,7 @@ public class ClickerActivity extends AppCompatActivity {
 
     private void updateUI() {
         tvPointsCount.setText("Точек: " + clickPoints.size());
-        StringBuilder sb = new StringBuilder("Точки:\n");
+        StringBuilder sb = new StringBuilder("Точки (по порядку):\n");
         for (int i = 0; i < clickPoints.size(); i++) {
             sb.append((i+1)).append(") X:").append((int)clickPoints.get(i).x)
               .append(" Y:").append((int)clickPoints.get(i).y).append("\n");
@@ -180,16 +201,21 @@ public class ClickerActivity extends AppCompatActivity {
         isActive = true;
         btnStartStop.setText("⏹ ОСТАНОВИТЬ");
         btnStartStop.setBackgroundColor(0xFFE53935);
-        Toast.makeText(this, "Автокликер запущен", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Автокликер запущен (по порядку 1→2→3...)", Toast.LENGTH_SHORT).show();
 
         clickTimer = new Timer();
         clickTimer.schedule(new TimerTask() {
+            int index = 0;
             @Override
             public void run() {
                 runOnUiThread(() -> {
-                    if (!isActive) return;
-                    // Исправлено: передаём ArrayList<ClickPoint>
-                    ClickAccessibilityService.performClick(clickPoints);
+                    if (!isActive || clickPoints.isEmpty()) return;
+                    // Кликаем по очереди
+                    ClickPoint point = clickPoints.get(index);
+                    ArrayList<ClickPoint> singlePoint = new ArrayList<>();
+                    singlePoint.add(point);
+                    ClickAccessibilityService.performClick(singlePoint);
+                    index = (index + 1) % clickPoints.size();
                 });
             }
         }, 0, interval);
@@ -206,6 +232,62 @@ public class ClickerActivity extends AppCompatActivity {
         Toast.makeText(this, "Автокликер остановлен", Toast.LENGTH_SHORT).show();
     }
 
+    // ===== СВЕРНУТЬ В КРУЖОК =====
+    private void minimizeToCircle() {
+        if (isMinimized) return;
+        isMinimized = true;
+
+        // Создаём плавающий кружок
+        minimizeCircle = new View(this);
+        minimizeCircle.setBackground(ContextCompat.getDrawable(this, R.drawable.circle_point));
+        minimizeCircle.setBackgroundColor(0xFF3F51B5);
+
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                70, 70,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+        );
+        params.gravity = Gravity.TOP | Gravity.START;
+        params.x = 100;
+        params.y = 200;
+
+        minimizeCircle.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_MOVE:
+                    params.x = (int) event.getRawX() - 35;
+                    params.y = (int) event.getRawY() - 35;
+                    windowManager.updateViewLayout(minimizeCircle, params);
+                    break;
+                case MotionEvent.ACTION_UP:
+                    // Возвращаем окно
+                    if (!isActive) {
+                        showFullScreen();
+                    }
+                    break;
+            }
+            return true;
+        });
+
+        windowManager.addView(minimizeCircle, params);
+        
+        // Сворачиваем окно
+        moveTaskToBack(true);
+        Toast.makeText(this, "Автокликер свернут в кружок", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showFullScreen() {
+        if (minimizeCircle != null) {
+            windowManager.removeView(minimizeCircle);
+            minimizeCircle = null;
+        }
+        isMinimized = false;
+        // Возвращаем активность на передний план
+        Intent intent = new Intent(this, ClickerActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        startActivity(intent);
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -217,5 +299,10 @@ public class ClickerActivity extends AppCompatActivity {
                 } catch (Exception e) {}
             }
         }
+        if (minimizeCircle != null) {
+            try {
+                windowManager.removeView(minimizeCircle);
+            } catch (Exception e) {}
+        }
     }
-                }
+}
