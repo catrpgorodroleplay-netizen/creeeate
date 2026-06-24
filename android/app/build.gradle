@@ -40,8 +40,9 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     
-    // === ПРОКСИ ДЛЯ WEBVIEW ===
-    implementation 'androidx.webkit:webkit:1.7.0'
+    // === ПРОКСИ (LittleProxy) ===
+    implementation 'org.littleshoot:littleproxy:2.0.0'
+    implementation 'org.slf4j:slf4j-android:1.7.36'
     
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
