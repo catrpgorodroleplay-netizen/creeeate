@@ -68,7 +68,7 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // ========== АВТОКЛИКЕР ==========
+    // Автокликер
     private ImageButton autoClickerCircle;
     private WindowManager.LayoutParams autoClickerParams;
     private boolean isAutoClickerCircleVisible = false;
@@ -79,7 +79,7 @@ public class MainActivity extends BridgeActivity {
     private int pointCounter = 1;
     private boolean isAutoClickerActive = false;
 
-    // ========== ЗАПИСЬ ЭКРАНА ==========
+    // Запись экрана
     private ImageButton recordCircle;
     private WindowManager.LayoutParams recordParams;
     private boolean isRecordCircleVisible = false;
@@ -87,7 +87,6 @@ public class MainActivity extends BridgeActivity {
     private MediaProjectionManager projectionManager;
     private Intent screenRecordIntent;
 
-    // ===== ВНУТРЕННИЙ КЛАСС =====
     public static class ClickPoint {
         public float x, y;
         public int id;
@@ -104,13 +103,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // ===== ЗАПРАШИВАЕМ ВСЕ РАЗРЕШЕНИЯ =====
-        requestAllPermissions();
-
-        // Проверка автокликера
-        if (!isAccessibilityServiceEnabled()) {
-            // Просто предупреждаем
-        }
+        // Разрешения
+        requestPermissionsIfNeeded();
 
         // Оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -125,10 +119,8 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // Для записи экрана
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
 
-        // WebView
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -142,38 +134,28 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ЗАПРОС РАЗРЕШЕНИЙ (БЕЗ ЗАПУСКА СЕРВИСА) =====
-    private void requestAllPermissions() {
-        java.util.ArrayList<String> permissions = new java.util.ArrayList<>();
-
-        // Микрофон
+    private void requestPermissionsIfNeeded() {
+        ArrayList<String> permissions = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.RECORD_AUDIO);
         }
-
-        // Камера
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA);
         }
-
-        // Уведомления (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS);
             }
         }
-
-        // Хранилище (Android 10-)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
             }
         }
-
         if (!permissions.isEmpty()) {
             ActivityCompat.requestPermissions(this,
                     permissions.toArray(new String[0]),
@@ -181,7 +163,6 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ПРОВЕРКА ACCESSIBILITY =====
     private boolean isAccessibilityServiceEnabled() {
         String service = getPackageName() + "/" + ClickAccessibilityService.class.getCanonicalName();
         try {
@@ -284,7 +265,6 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    // ===== ОВЕРЛЕЙ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -335,7 +315,6 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Кнопки управления
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -357,7 +336,7 @@ public class MainActivity extends BridgeActivity {
             if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
         });
 
-        // Три кнопки внизу
+        // ===== ТРИ КНОПКИ ВНИЗУ =====
         LinearLayout bottomButtons = new LinearLayout(this);
         bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
         bottomButtons.setGravity(Gravity.CENTER);
@@ -369,6 +348,7 @@ public class MainActivity extends BridgeActivity {
         bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         bottomButtons.setLayoutParams(bottomP);
 
+        // 1. Автокликер
         ImageButton autoBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
@@ -381,10 +361,12 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
+        // 2. Запись экрана
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
         recordBtn.setOnClickListener(v -> showRecordCircle());
 
+        // 3. Корзина
         ImageButton trashBtn = createCircleButton(createTrashIcon(), "#880E4F");
         trashBtn.setLayoutParams(btnP);
         trashBtn.setOnClickListener(v -> {
@@ -472,10 +454,6 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!isDragging) {
-                        if (!isAccessibilityServiceEnabled()) {
-                            requestAccessibilityPermission();
-                            return true;
-                        }
                         showAutoClickerMenu();
                     }
                     return true;
@@ -1062,31 +1040,19 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
-        
         if (code == REQUEST_MICROPHONE) {
             boolean hasMicrophone = false;
-            boolean hasNotifications = false;
-            
             for (int i = 0; i < perms.length; i++) {
                 if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
                     hasMicrophone = true;
                 }
-                if (perms[i].equals(Manifest.permission.POST_NOTIFICATIONS) && results[i] == PackageManager.PERMISSION_GRANTED) {
-                    hasNotifications = true;
-                }
             }
-            
             if (hasMicrophone) {
                 Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "🎤 Микрофон НЕ разрешён, голосовой чат не будет работать", Toast.LENGTH_LONG).show();
-            }
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifications) {
-                Toast.makeText(this, "⚠️ Разрешите уведомления для работы в фоне", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_LONG).show();
             }
         }
-        
         if (code == REQUEST_CAMERA && results.length > 0) {
             if (results[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
@@ -1109,4 +1075,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-            }
+    }
