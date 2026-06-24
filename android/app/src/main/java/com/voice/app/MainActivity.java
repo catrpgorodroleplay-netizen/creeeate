@@ -888,9 +888,11 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void stopScreenRecording() {
-        Intent stopIntent = new Intent(this, ScreenRecordService.class);
-        stopIntent.setAction("STOP");
-        ContextCompat.startForegroundService(this, stopIntent);
+        if (ScreenRecordService.isRunning) {
+            Intent stopIntent = new Intent(this, ScreenRecordService.class);
+            stopIntent.setAction("STOP");
+            ContextCompat.startForegroundService(this, stopIntent);
+        }
     }
 
     // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
@@ -1004,6 +1006,7 @@ public class MainActivity extends BridgeActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_SCREEN_RECORD) {
             if (resultCode == Activity.RESULT_OK && data != null) {
+                ScreenRecordService.delaySeconds = 0;
                 Intent serviceIntent = new Intent(this, ScreenRecordService.class);
                 serviceIntent.setAction("START");
                 serviceIntent.putExtra("resultCode", resultCode);
@@ -1075,4 +1078,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-    }
+                }
