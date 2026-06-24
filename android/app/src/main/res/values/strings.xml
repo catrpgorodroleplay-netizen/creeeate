@@ -4,7 +4,5 @@
     <string name="title_activity_main">VoiceChat</string>
     <string name="package_name">com.voice.app</string>
     <string name="custom_url_scheme">com.voice.app</string>
-    
-    <!-- Добавь эту строку для автокликера -->
     <string name="accessibility_service_description">Позволяет автокликеру нажимать на экран в выбранных точках</string>
 </resources>
