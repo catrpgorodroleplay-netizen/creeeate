@@ -68,7 +68,7 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // Автокликер
+    // ========== АВТОКЛИКЕР ==========
     private ImageButton autoClickerCircle;
     private WindowManager.LayoutParams autoClickerParams;
     private boolean isAutoClickerCircleVisible = false;
@@ -79,7 +79,7 @@ public class MainActivity extends BridgeActivity {
     private int pointCounter = 1;
     private boolean isAutoClickerActive = false;
 
-    // Запись экрана
+    // ========== ЗАПИСЬ ЭКРАНА ==========
     private ImageButton recordCircle;
     private WindowManager.LayoutParams recordParams;
     private boolean isRecordCircleVisible = false;
@@ -103,10 +103,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Разрешения
         requestPermissionsIfNeeded();
 
-        // Оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -136,42 +134,25 @@ public class MainActivity extends BridgeActivity {
 
     private void requestPermissionsIfNeeded() {
         ArrayList<String> permissions = new ArrayList<>();
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO);
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.CAMERA);
-        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.RECORD_AUDIO);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.CAMERA);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS);
-            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.POST_NOTIFICATIONS);
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
         }
         if (!permissions.isEmpty()) {
-            ActivityCompat.requestPermissions(this,
-                    permissions.toArray(new String[0]),
-                    REQUEST_MICROPHONE);
+            ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), REQUEST_MICROPHONE);
         }
     }
 
     private boolean isAccessibilityServiceEnabled() {
         String service = getPackageName() + "/" + ClickAccessibilityService.class.getCanonicalName();
         try {
-            String enabledServices = Settings.Secure.getString(getContentResolver(),
-                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            String enabledServices = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
             return enabledServices != null && enabledServices.contains(service);
-        } catch (Exception e) {
-            return false;
-        }
+        } catch (Exception e) { return false; }
     }
 
     private void requestAccessibilityPermission() {
@@ -191,7 +172,6 @@ public class MainActivity extends BridgeActivity {
         int flag = getOverlayFlag();
         mainCircle = new ImageButton(this);
         mainCircle.setImageBitmap(createGamepadBitmap());
-
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);
         d.setColor(Color.parseColor("#CC0000"));
@@ -203,32 +183,22 @@ public class MainActivity extends BridgeActivity {
         mainCircleParams = new WindowManager.LayoutParams(136, 136, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         mainCircleParams.gravity = Gravity.TOP | Gravity.START;
-        mainCircleParams.x = 100;
-        mainCircleParams.y = 200;
+        mainCircleParams.x = 100; mainCircleParams.y = 200;
 
         mainCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    startX = event.getRawX();
-                    startY = event.getRawY();
-                    initialX = mainCircleParams.x;
-                    initialY = mainCircleParams.y;
-                    isDragging = false;
-                    return true;
+                    startX = event.getRawX(); startY = event.getRawY();
+                    initialX = mainCircleParams.x; initialY = mainCircleParams.y;
+                    isDragging = false; return true;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = event.getRawX() - startX;
-                    float dy = event.getRawY() - startY;
+                    float dx = event.getRawX() - startX, dy = event.getRawY() - startY;
                     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isDragging = true;
-                    mainCircleParams.x = initialX + (int) dx;
-                    mainCircleParams.y = initialY + (int) dy;
-                    if (windowManager != null) {
-                        windowManager.updateViewLayout(mainCircle, mainCircleParams);
-                    }
+                    mainCircleParams.x = initialX + (int) dx; mainCircleParams.y = initialY + (int) dy;
+                    if (windowManager != null) windowManager.updateViewLayout(mainCircle, mainCircleParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (!isDragging) {
-                        toggleMainOverlay();
-                    }
+                    if (!isDragging) toggleMainOverlay();
                     return true;
             }
             return false;
@@ -250,7 +220,6 @@ public class MainActivity extends BridgeActivity {
         paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(6);
-
         float cx = size / 2f, cy = size / 2f;
         canvas.drawRoundRect(cx - 32, cy - 22, cx + 32, cy + 22, 18, 18, paint);
         canvas.drawCircle(cx - 25, cy, 12, paint);
@@ -278,7 +247,6 @@ public class MainActivity extends BridgeActivity {
     private void showMainOverlay() {
         if (isMainOverlayVisible) return;
         int flag = getOverlayFlag();
-
         mainOverlay = new FrameLayout(this);
         mainOverlay.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         mainOverlay.setPadding(15, 15, 15, 15);
@@ -297,23 +265,15 @@ public class MainActivity extends BridgeActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                request.grant(new String[]{
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
-                });
+                request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE, PermissionRequest.RESOURCE_VIDEO_CAPTURE});
             }
         });
         webView.setWebViewClient(new WebViewClient());
 
-        if (webViewState != null) {
-            webView.restoreState(webViewState);
-        } else {
-            webView.loadUrl("https://crconferensimessenger.vercel.app/");
-        }
+        if (webViewState != null) webView.restoreState(webViewState);
+        else webView.loadUrl("https://crconferensimessenger.vercel.app/");
 
-        webView.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
+        webView.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
@@ -336,43 +296,31 @@ public class MainActivity extends BridgeActivity {
             if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
         });
 
-        // ===== ТРИ КНОПКИ ВНИЗУ =====
         LinearLayout bottomButtons = new LinearLayout(this);
         bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
         bottomButtons.setGravity(Gravity.CENTER);
         bottomButtons.setPadding(20, 10, 20, 30);
-
-        FrameLayout.LayoutParams bottomP = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
+        FrameLayout.LayoutParams bottomP = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         bottomButtons.setLayoutParams(bottomP);
 
-        // 1. Автокликер
         ImageButton autoBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
         autoBtn.setLayoutParams(btnP);
         autoBtn.setOnClickListener(v -> {
-            if (!isAccessibilityServiceEnabled()) {
-                requestAccessibilityPermission();
-            } else {
-                showAutoClickerCircle();
-            }
+            if (!isAccessibilityServiceEnabled()) requestAccessibilityPermission();
+            else showAutoClickerCircle();
         });
 
-        // 2. Запись экрана
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
         recordBtn.setOnClickListener(v -> showRecordCircle());
 
-        // 3. Корзина
         ImageButton trashBtn = createCircleButton(createTrashIcon(), "#880E4F");
         trashBtn.setLayoutParams(btnP);
         trashBtn.setOnClickListener(v -> {
-            hideMainOverlay();
-            hideAutoClickerCircle();
-            hideRecordCircle();
+            hideMainOverlay(); hideAutoClickerCircle(); hideRecordCircle();
             if (mainCircle != null && windowManager != null) {
                 windowManager.removeView(mainCircle);
                 mainCircle = null;
@@ -389,12 +337,8 @@ public class MainActivity extends BridgeActivity {
         mainOverlay.addView(minimizeBtn);
         mainOverlay.addView(bottomButtons);
 
-        mainOverlayParams = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                flag,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
+        mainOverlayParams = new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT, flag,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         mainOverlayParams.gravity = Gravity.CENTER;
 
         if (windowManager != null) {
@@ -411,14 +355,12 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== АВТОКЛИКЕР =====
+    // ===== АВТОКЛИКЕР С РАСШИРЕННЫМИ НАСТРОЙКАМИ =====
     private void showAutoClickerCircle() {
         if (isAutoClickerCircleVisible) return;
         int flag = getOverlayFlag();
-
         autoClickerCircle = new ImageButton(this);
         autoClickerCircle.setImageBitmap(createAutoClickerBitmap());
-
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);
         d.setColor(Color.parseColor("#3F51B5"));
@@ -430,32 +372,22 @@ public class MainActivity extends BridgeActivity {
         autoClickerParams = new WindowManager.LayoutParams(120, 120, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         autoClickerParams.gravity = Gravity.TOP | Gravity.START;
-        autoClickerParams.x = 250;
-        autoClickerParams.y = 300;
+        autoClickerParams.x = 250; autoClickerParams.y = 300;
 
         autoClickerCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    startX = event.getRawX();
-                    startY = event.getRawY();
-                    initialX = autoClickerParams.x;
-                    initialY = autoClickerParams.y;
-                    isDragging = false;
-                    return true;
+                    startX = event.getRawX(); startY = event.getRawY();
+                    initialX = autoClickerParams.x; initialY = autoClickerParams.y;
+                    isDragging = false; return true;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = event.getRawX() - startX;
-                    float dy = event.getRawY() - startY;
+                    float dx = event.getRawX() - startX, dy = event.getRawY() - startY;
                     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isDragging = true;
-                    autoClickerParams.x = initialX + (int) dx;
-                    autoClickerParams.y = initialY + (int) dy;
-                    if (windowManager != null) {
-                        windowManager.updateViewLayout(autoClickerCircle, autoClickerParams);
-                    }
+                    autoClickerParams.x = initialX + (int) dx; autoClickerParams.y = initialY + (int) dy;
+                    if (windowManager != null) windowManager.updateViewLayout(autoClickerCircle, autoClickerParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (!isDragging) {
-                        showAutoClickerMenu();
-                    }
+                    if (!isDragging) showAutoClickerMenu();
                     return true;
             }
             return false;
@@ -473,9 +405,7 @@ public class MainActivity extends BridgeActivity {
             isAutoClickerCircleVisible = false;
         }
         for (ClickPoint point : clickPoints) {
-            if (point.view != null && windowManager != null) {
-                windowManager.removeView(point.view);
-            }
+            if (point.view != null && windowManager != null) windowManager.removeView(point.view);
         }
         clickPoints.clear();
         pointCounter = 1;
@@ -521,6 +451,7 @@ public class MainActivity extends BridgeActivity {
         title.setTextSize(22);
         layout.addView(title);
 
+        // Кнопка "Добавить точку"
         Button addBtn = new Button(this);
         addBtn.setText("➕ Добавить точку");
         addBtn.setTextColor(Color.WHITE);
@@ -532,8 +463,9 @@ public class MainActivity extends BridgeActivity {
         });
         layout.addView(addBtn);
 
-        LinearLayout intLayout = new LinearLayout(this);
-        intLayout.setOrientation(LinearLayout.HORIZONTAL);
+        // Настройка интервала с выбором единиц
+        LinearLayout intervalLayout = new LinearLayout(this);
+        intervalLayout.setOrientation(LinearLayout.HORIZONTAL);
         EditText intervalInput = new EditText(this);
         intervalInput.setHint("Интервал (мс)");
         intervalInput.setTextColor(Color.WHITE);
@@ -542,23 +474,32 @@ public class MainActivity extends BridgeActivity {
         intervalInput.setPadding(15, 10, 15, 10);
         intervalInput.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         intervalInput.setText(String.valueOf(clickInterval));
-        intLayout.addView(intervalInput);
+        intervalLayout.addView(intervalInput);
 
-        Button saveIntervalBtn = new Button(this);
-        saveIntervalBtn.setText("✅");
-        saveIntervalBtn.setTextColor(Color.WHITE);
-        saveIntervalBtn.setBackgroundColor(Color.parseColor("#555555"));
-        saveIntervalBtn.setOnClickListener(v -> {
-            try {
-                clickInterval = Integer.parseInt(intervalInput.getText().toString());
-                Toast.makeText(this, "Интервал: " + clickInterval + " мс", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                Toast.makeText(this, "Введите число", Toast.LENGTH_SHORT).show();
-            }
-        });
-        intLayout.addView(saveIntervalBtn);
-        layout.addView(intLayout);
+        String[] units = {"мс", "сек", "мин"};
+        for (String unit : units) {
+            Button unitBtn = new Button(this);
+            unitBtn.setText(unit);
+            unitBtn.setTextColor(Color.WHITE);
+            unitBtn.setBackgroundColor(Color.parseColor("#555555"));
+            unitBtn.setOnClickListener(v -> {
+                try {
+                    int val = Integer.parseInt(intervalInput.getText().toString());
+                    switch (unit) {
+                        case "мс": clickInterval = val; break;
+                        case "сек": clickInterval = val * 1000; break;
+                        case "мин": clickInterval = val * 60 * 1000; break;
+                    }
+                    Toast.makeText(this, "Интервал: " + clickInterval + " мс", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(this, "Введите число", Toast.LENGTH_SHORT).show();
+                }
+            });
+            intervalLayout.addView(unitBtn);
+        }
+        layout.addView(intervalLayout);
 
+        // Кнопка "Запустить/Остановить"
         Button startBtn = new Button(this);
         startBtn.setText(isAutoClickerActive ? "⏹ Остановить" : "▶ Запустить");
         startBtn.setTextColor(Color.WHITE);
@@ -588,9 +529,7 @@ public class MainActivity extends BridgeActivity {
         clearBtn.setBackgroundColor(Color.parseColor("#DD2C00"));
         clearBtn.setOnClickListener(v -> {
             for (ClickPoint point : clickPoints) {
-                if (point.view != null && windowManager != null) {
-                    windowManager.removeView(point.view);
-                }
+                if (point.view != null && windowManager != null) windowManager.removeView(point.view);
             }
             clickPoints.clear();
             pointCounter = 1;
@@ -651,26 +590,17 @@ public class MainActivity extends BridgeActivity {
         pointView.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    pStartX[0] = event.getRawX();
-                    pStartY[0] = event.getRawY();
-                    pInitX[0] = pointParams.x;
-                    pInitY[0] = pointParams.y;
-                    pIsDragging[0] = false;
-                    return true;
+                    pStartX[0] = event.getRawX(); pStartY[0] = event.getRawY();
+                    pInitX[0] = pointParams.x; pInitY[0] = pointParams.y;
+                    pIsDragging[0] = false; return true;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = event.getRawX() - pStartX[0];
-                    float dy = event.getRawY() - pStartY[0];
+                    float dx = event.getRawX() - pStartX[0], dy = event.getRawY() - pStartY[0];
                     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) pIsDragging[0] = true;
-                    pointParams.x = pInitX[0] + (int) dx;
-                    pointParams.y = pInitY[0] + (int) dy;
-                    if (windowManager != null) {
-                        windowManager.updateViewLayout(pointView, pointParams);
-                    }
+                    pointParams.x = pInitX[0] + (int) dx; pointParams.y = pInitY[0] + (int) dy;
+                    if (windowManager != null) windowManager.updateViewLayout(pointView, pointParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (!pIsDragging[0]) {
-                        removeClickPoint(pointId, pointView);
-                    }
+                    if (!pIsDragging[0]) removeClickPoint(pointId, pointView);
                     return true;
             }
             return false;
@@ -680,16 +610,12 @@ public class MainActivity extends BridgeActivity {
         newPoint.view = pointView;
         clickPoints.add(newPoint);
 
-        if (windowManager != null) {
-            windowManager.addView(pointView, pointParams);
-        }
+        if (windowManager != null) windowManager.addView(pointView, pointParams);
         Toast.makeText(this, "Точка " + pointId + " добавлена", Toast.LENGTH_SHORT).show();
     }
 
     private void removeClickPoint(int id, View view) {
-        if (windowManager != null && view != null) {
-            windowManager.removeView(view);
-        }
+        if (windowManager != null && view != null) windowManager.removeView(view);
         for (int i = 0; i < clickPoints.size(); i++) {
             if (clickPoints.get(i).id == id) {
                 clickPoints.remove(i);
@@ -748,32 +674,22 @@ public class MainActivity extends BridgeActivity {
         recordParams = new WindowManager.LayoutParams(120, 120, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         recordParams.gravity = Gravity.TOP | Gravity.START;
-        recordParams.x = 400;
-        recordParams.y = 300;
+        recordParams.x = 400; recordParams.y = 300;
 
         recordCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    startX = event.getRawX();
-                    startY = event.getRawY();
-                    initialX = recordParams.x;
-                    initialY = recordParams.y;
-                    isDragging = false;
-                    return true;
+                    startX = event.getRawX(); startY = event.getRawY();
+                    initialX = recordParams.x; initialY = recordParams.y;
+                    isDragging = false; return true;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = event.getRawX() - startX;
-                    float dy = event.getRawY() - startY;
+                    float dx = event.getRawX() - startX, dy = event.getRawY() - startY;
                     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) isDragging = true;
-                    recordParams.x = initialX + (int) dx;
-                    recordParams.y = initialY + (int) dy;
-                    if (windowManager != null) {
-                        windowManager.updateViewLayout(recordCircle, recordParams);
-                    }
+                    recordParams.x = initialX + (int) dx; recordParams.y = initialY + (int) dy;
+                    if (windowManager != null) windowManager.updateViewLayout(recordCircle, recordParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (!isDragging) {
-                        showRecordMenu();
-                    }
+                    if (!isDragging) showRecordMenu();
                     return true;
             }
             return false;
@@ -824,14 +740,6 @@ public class MainActivity extends BridgeActivity {
         title.setTextSize(22);
         layout.addView(title);
 
-        TextView timerText = new TextView(this);
-        timerText.setText("00:00");
-        timerText.setTextColor(Color.WHITE);
-        timerText.setTextSize(30);
-        timerText.setGravity(Gravity.CENTER);
-        timerText.setPadding(0, 10, 0, 10);
-        layout.addView(timerText);
-
         LinearLayout delayLayout = new LinearLayout(this);
         delayLayout.setOrientation(LinearLayout.HORIZONTAL);
         int[] delays = {0, 5, 10, 15, 30};
@@ -855,19 +763,6 @@ public class MainActivity extends BridgeActivity {
         }
         layout.addView(delayLayout);
 
-        if (ScreenRecordService.isRunning) {
-            Button stopBtn = new Button(this);
-            stopBtn.setText("⏹ Остановить");
-            stopBtn.setTextColor(Color.WHITE);
-            stopBtn.setBackgroundColor(Color.parseColor("#DD2C00"));
-            stopBtn.setOnClickListener(v -> {
-                stopScreenRecording();
-                popup.dismiss();
-                isRecordMenuOpen = false;
-            });
-            layout.addView(stopBtn);
-        }
-
         Button closeBtn = new Button(this);
         closeBtn.setText("✕ Закрыть");
         closeBtn.setTextColor(Color.WHITE);
@@ -887,15 +782,51 @@ public class MainActivity extends BridgeActivity {
         popup.setOnDismissListener(() -> isRecordMenuOpen = false);
     }
 
-    private void stopScreenRecording() {
-        if (ScreenRecordService.isRunning) {
-            Intent stopIntent = new Intent(this, ScreenRecordService.class);
-            stopIntent.setAction("STOP");
-            ContextCompat.startForegroundService(this, stopIntent);
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_SCREEN_RECORD && resultCode == Activity.RESULT_OK && data != null) {
+            Intent serviceIntent = new Intent(this, ScreenRecordService.class);
+            serviceIntent.setAction("START");
+            serviceIntent.putExtra("resultCode", resultCode);
+            serviceIntent.putExtra("data", data);
+            ContextCompat.startForegroundService(this, serviceIntent);
+            Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
+        } else if (requestCode == REQUEST_SCREEN_RECORD) {
+            Toast.makeText(this, "Запись экрана не разрешена", Toast.LENGTH_SHORT).show();
+        }
+        if (requestCode == REQUEST_ACCESSIBILITY && isAccessibilityServiceEnabled()) {
+            Toast.makeText(this, "✅ Автокликер включен!", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (mainCircle != null && !isMainOverlayVisible) mainCircle.setVisibility(View.GONE);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mainCircle != null && !isMainOverlayVisible) mainCircle.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
+        super.onRequestPermissionsResult(code, perms, results);
+        if (code == REQUEST_MICROPHONE) {
+            for (int i = 0; i < perms.length; i++) {
+                if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+        if (code == REQUEST_CAMERA && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private int getOverlayFlag() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
@@ -1002,80 +933,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_SCREEN_RECORD) {
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                ScreenRecordService.delaySeconds = 0;
-                Intent serviceIntent = new Intent(this, ScreenRecordService.class);
-                serviceIntent.setAction("START");
-                serviceIntent.putExtra("resultCode", resultCode);
-                serviceIntent.putExtra("data", data);
-                ContextCompat.startForegroundService(this, serviceIntent);
-                Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Запись экрана не разрешена", Toast.LENGTH_SHORT).show();
-            }
-        }
-        if (requestCode == REQUEST_ACCESSIBILITY) {
-            if (isAccessibilityServiceEnabled()) {
-                Toast.makeText(this, "✅ Автокликер включен!", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (mainCircle != null && !isMainOverlayVisible) {
-            mainCircle.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (mainCircle != null && !isMainOverlayVisible) {
-            mainCircle.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
-        super.onRequestPermissionsResult(code, perms, results);
-        if (code == REQUEST_MICROPHONE) {
-            boolean hasMicrophone = false;
-            for (int i = 0; i < perms.length; i++) {
-                if (perms[i].equals(Manifest.permission.RECORD_AUDIO) && results[i] == PackageManager.PERMISSION_GRANTED) {
-                    hasMicrophone = true;
-                }
-            }
-            if (hasMicrophone) {
-                Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "🎤 Микрофон НЕ разрешён", Toast.LENGTH_LONG).show();
-            }
-        }
-        if (code == REQUEST_CAMERA && results.length > 0) {
-            if (results[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "📷 Камера НЕ разрешена", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    @Override
     public void onDestroy() {
         super.onDestroy();
         stopAutoClicker();
-        if (mainCircle != null && windowManager != null) {
-            windowManager.removeView(mainCircle);
-        }
-        if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
-            windowManager.removeView(mainOverlay);
-        }
+        if (mainCircle != null && windowManager != null) windowManager.removeView(mainCircle);
+        if (mainOverlay != null && windowManager != null && isMainOverlayVisible) windowManager.removeView(mainOverlay);
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-                }
+                    }
