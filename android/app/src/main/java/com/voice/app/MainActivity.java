@@ -2,13 +2,7 @@ package com.voice.app;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -28,14 +22,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,7 +48,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -98,6 +89,7 @@ public class MainActivity extends BridgeActivity {
     private Timer autoClickTimer;
     private int clickInterval = 1000;
     private int pointCounter = 1;
+    private boolean isAutoClickerActive = false; // ← ЭТО БЫЛО ПРОПУЩЕНО
 
     // Переменные для записи экрана
     private ImageButton recordCircle;
@@ -1255,4 +1247,4 @@ public class MainActivity extends BridgeActivity {
         }
         clickPoints.clear();
     }
-            }
+        }
