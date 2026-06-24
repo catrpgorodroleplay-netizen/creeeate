@@ -61,6 +61,12 @@
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
 
+        <!-- СЕРВИС ПРОКСИ (LittleProxy) -->
+        <service
+            android:name=".LittleProxyService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <!-- СЕРВИС ДЛЯ ГОЛОСА -->
         <service
             android:name=".VoiceForegroundService"
