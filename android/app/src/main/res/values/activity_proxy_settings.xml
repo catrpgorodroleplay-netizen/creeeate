@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1A1A2E"
+    android:padding="30dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔐 НАСТРОЙКИ ПРОКСИ"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="30dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Сервер (IP или домен)"
+        android:textColor="#AAAAAA"
+        android:textSize="14sp"
+        android:paddingBottom="5dp"/>
+
+    <EditText
+        android:id="@+id/etProxyServer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="например: 123.45.67.89"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:background="#333344"
+        android:padding="15dp"
+        android:inputType="text"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Порт"
+        android:textColor="#AAAAAA"
+        android:textSize="14sp"
+        android:paddingTop="15dp"
+        android:paddingBottom="5dp"/>
+
+    <EditText
+        android:id="@+id/etProxyPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="например: 443"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:background="#333344"
+        android:padding="15dp"
+        android:inputType="number"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Секрет (32 hex-символа)"
+        android:textColor="#AAAAAA"
+        android:textSize="14sp"
+        android:paddingTop="15dp"
+        android:paddingBottom="5dp"/>
+
+    <EditText
+        android:id="@+id/etProxySecret"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="например: a1b2c3d4e5f67890..."
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:background="#333344"
+        android:padding="15dp"
+        android:inputType="text"/>
+
+    <Button
+        android:id="@+id/btnSaveProxy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="💾 СОХРАНИТЬ"
+        android:textColor="#FFFFFF"
+        android:background="#4CAF50"
+        android:padding="15dp"
+        android:layout_marginTop="30dp"/>
+
+    <Button
+        android:id="@+id/btnClearProxy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🗑 УДАЛИТЬ ПРОКСИ"
+        android:textColor="#FFFFFF"
+        android:background="#E53935"
+        android:padding="15dp"
+        android:layout_marginTop="10dp"/>
+
+</LinearLayout>
