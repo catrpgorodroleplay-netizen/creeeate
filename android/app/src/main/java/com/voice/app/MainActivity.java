@@ -121,6 +121,7 @@ public class MainActivity extends BridgeActivity {
     // ===== ПРОКСИ =====
     private void setupProxy(boolean enable) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            Toast.makeText(this, "Прокси не поддерживается на этом устройстве", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -301,7 +302,6 @@ public class MainActivity extends BridgeActivity {
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
-            // Применяем прокси при загрузке
             applyProxyOnStart();
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
@@ -337,7 +337,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // КНОПКА НАСТРОЕК ПРОКСИ (шестерёнка)
+        // КНОПКА НАСТРОЕК ПРОКСИ
         ImageButton settingsBtn = createCircleButton(createSettingsIcon(), "#2196F3");
         FrameLayout.LayoutParams settingsP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         settingsP.setMargins(0, 0, 20, 120);
