@@ -1,6 +1,14 @@
 package com.voice.app;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -10,10 +18,22 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.VirtualDisplay;
+import android.media.MediaRecorder;
+import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -33,12 +53,20 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+
 import com.getcapacitor.BridgeActivity;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -47,67 +75,74 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    
+    private static final int REQUEST_SCREEN_RECORD = 103;
+    private static final int REQUEST_ACCESSIBILITY = 104;
+    private static final String TAG = "MainActivity";
+
     private WindowManager windowManager;
-    
-    // ГЛАВНЫЙ КРУЖОК
     public static ImageButton mainCircle;
     private WindowManager.LayoutParams mainCircleParams;
-    
-    // ГЛАВНЫЙ ОВЕРЛЕЙ С САЙТОМ
+
     private FrameLayout mainOverlay;
     private WebView webView;
     private WindowManager.LayoutParams mainOverlayParams;
     private boolean isMainOverlayVisible = false;
     private Bundle webViewState = null;
-    
-    // КРУЖОК АВТОКЛИКЕРА
+
+    // Переменные для автокликера
     private ImageButton autoClickerCircle;
     private WindowManager.LayoutParams autoClickerParams;
     private boolean isAutoClickerCircleVisible = false;
     private boolean isAutoClickerMenuOpen = false;
-    
-    // КРУЖОК ЗАПИСИ
+    private ArrayList<ClickPoint> clickPoints = new ArrayList<>();
+    private Timer autoClickTimer;
+    private int clickInterval = 1000;
+    private int pointCounter = 1;
+
+    // Переменные для записи экрана
     private ImageButton recordCircle;
     private WindowManager.LayoutParams recordParams;
     private boolean isRecordCircleVisible = false;
     private boolean isRecordMenuOpen = false;
-    
-    // Перетаскивание
-    private float startX, startY;
-    private int initialX, initialY;
-    private boolean isDragging = false;
-
-    // Автокликер
-    private boolean isAutoClickerActive = false;
-    private ArrayList<float[]> clickPoints = new ArrayList<>();
-    private Timer autoClickTimer;
-    private int clickInterval = 1000;
-    private String intervalUnit = "ms";
-    private int pointCounter = 1;
-
-    // Запись экрана
+    private MediaProjectionManager projectionManager;
+    private MediaProjection mediaProjection;
+    private VirtualDisplay virtualDisplay;
+    private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
     private Timer recordTimer;
     private int recordSeconds = 0;
     private TextView recordTimerText;
+    private String recordFilePath = "";
+    private int screenWidth = 1080;
+    private int screenHeight = 1920;
+    private int screenDensity = 320;
+
+    // Перетаскивание кружков
+    private float startX, startY;
+    private int initialX, initialY;
+    private boolean isDragging = false;
+
+    // === ВНУТРЕННИЙ КЛАСС ДЛЯ ТОЧЕК КЛИКЕРА ===
+    private class ClickPoint {
+        float x, y;
+        int id;
+        View view;
+        ClickPoint(float x, float y, int id) {
+            this.x = x;
+            this.y = y;
+            this.id = id;
+            this.view = null;
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
-        }
-        
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
-        }
+        // Запросы разрешений
+        requestPermissionsIfNeeded();
 
+        // Запуск главного кружка после получения разрешения на оверлей
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -119,30 +154,58 @@ public class MainActivity extends BridgeActivity {
         } else {
             createMainCircle();
         }
-        
+
+        // Запуск Foreground Service для микрофона
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
-        
+
+        // Инициализация менеджера для записи экрана
+        projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+
+        // Настройка WebView
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
                 @Override
                 public void onPermissionRequest(PermissionRequest request) {
                     request.grant(new String[]{
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                            PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                            PermissionRequest.RESOURCE_VIDEO_CAPTURE
                     });
                 }
             });
         }
     }
 
-    // ========== ГЛАВНЫЙ КРУЖОК ==========
+    private void requestPermissionsIfNeeded() {
+        // Микрофон
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
+        }
+        // Камера
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
+        }
+        // Хранилище (для записи экрана)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_OVERLAY_PERMISSION);
+            }
+        }
+    }
+
+    // ===== ГЛАВНЫЙ КРУЖОК =====
     private void createMainCircle() {
         int flag = getOverlayFlag();
-        
+
         mainCircle = new ImageButton(this);
         mainCircle.setImageBitmap(createGamepadBitmap());
-        
+
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#CC0000"));
@@ -150,13 +213,13 @@ public class MainActivity extends BridgeActivity {
         mainCircle.setBackground(drawable);
         mainCircle.setPadding(25, 25, 25, 25);
         mainCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        
+
         mainCircleParams = new WindowManager.LayoutParams(136, 136, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         mainCircleParams.gravity = Gravity.TOP | Gravity.START;
         mainCircleParams.x = 100;
         mainCircleParams.y = 200;
-        
+
         mainCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -184,7 +247,7 @@ public class MainActivity extends BridgeActivity {
             }
             return false;
         });
-        
+
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         if (windowManager != null) {
             windowManager.addView(mainCircle, mainCircleParams);
@@ -201,7 +264,7 @@ public class MainActivity extends BridgeActivity {
         paint.setColor(Color.WHITE);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(6);
-        
+
         float cx = size / 2f, cy = size / 2f;
         canvas.drawRoundRect(cx - 32, cy - 22, cx + 32, cy + 22, 18, 18, paint);
         canvas.drawCircle(cx - 25, cy, 12, paint);
@@ -216,13 +279,7 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    private int getOverlayFlag() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
-                WindowManager.LayoutParams.TYPE_PHONE;
-    }
-
-    // ========== ГЛАВНЫЙ ОВЕРЛЕЙ (САЙТ + 3 КНОПКИ) ==========
+    // ===== ОВЕРЛЕЙ С САЙТОМ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -237,13 +294,13 @@ public class MainActivity extends BridgeActivity {
 
     private void showMainOverlay() {
         if (isMainOverlayVisible) return;
-        
+
         int flag = getOverlayFlag();
-        
+
         mainOverlay = new FrameLayout(this);
         mainOverlay.setBackgroundColor(Color.parseColor("#DD1E1E1E"));
         mainOverlay.setPadding(15, 15, 15, 15);
-        
+
         webView = new WebView(this);
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
@@ -254,29 +311,29 @@ public class MainActivity extends BridgeActivity {
         ws.setUseWideViewPort(true);
         ws.setLoadWithOverviewMode(true);
         ws.setJavaScriptCanOpenWindowsAutomatically(true);
-        
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
                 request.grant(new String[]{
-                    PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-                    PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE
                 });
             }
         });
         webView.setWebViewClient(new WebViewClient());
-        
+
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
-        
+
         webView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
-        
-        // Кнопка ЗАКРЫТЬ
+
+        // Кнопка закрыть (крестик)
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -287,8 +344,8 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
-        
-        // Кнопка СВЕРНУТЬ
+
+        // Кнопка свернуть
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
         FrameLayout.LayoutParams minP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
         minP.setMargins(0, 40, 20, 0);
@@ -302,31 +359,31 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
-        
-        // ===== ТРИ БОЛЬШИЕ КНОПКИ ВНИЗУ =====
+
+        // Три кнопки внизу
         LinearLayout bottomButtons = new LinearLayout(this);
         bottomButtons.setOrientation(LinearLayout.HORIZONTAL);
         bottomButtons.setGravity(Gravity.CENTER);
         bottomButtons.setPadding(20, 10, 20, 30);
-        
+
         FrameLayout.LayoutParams bottomP = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
         bottomP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         bottomButtons.setLayoutParams(bottomP);
-        
+
         // 1. Автокликер
         ImageButton autoBtn = createCircleButton(createAutoClickerIcon(), "#3F51B5");
         LinearLayout.LayoutParams btnP = new LinearLayout.LayoutParams(100, 100);
         btnP.setMargins(20, 0, 20, 0);
         autoBtn.setLayoutParams(btnP);
         autoBtn.setOnClickListener(v -> showAutoClickerCircle());
-        
+
         // 2. Запись экрана
         ImageButton recordBtn = createCircleButton(createRecordIcon(), "#E53935");
         recordBtn.setLayoutParams(btnP);
         recordBtn.setOnClickListener(v -> showRecordCircle());
-        
+
         // 3. Корзина
         ImageButton trashBtn = createCircleButton(createTrashIcon(), "#880E4F");
         trashBtn.setLayoutParams(btnP);
@@ -340,16 +397,16 @@ public class MainActivity extends BridgeActivity {
             }
             finishAffinity();
         });
-        
+
         bottomButtons.addView(autoBtn);
         bottomButtons.addView(recordBtn);
         bottomButtons.addView(trashBtn);
-        
+
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
         mainOverlay.addView(bottomButtons);
-        
+
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -357,7 +414,7 @@ public class MainActivity extends BridgeActivity {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         mainOverlayParams.gravity = Gravity.CENTER;
-        
+
         if (windowManager != null) {
             windowManager.addView(mainOverlay, mainOverlayParams);
             isMainOverlayVisible = true;
@@ -372,15 +429,15 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ========== КРУЖОК АВТОКЛИКЕРА ==========
+    // ===== КРУЖОК АВТОКЛИКЕРА =====
     private void showAutoClickerCircle() {
         if (isAutoClickerCircleVisible) return;
-        
+
         int flag = getOverlayFlag();
-        
+
         autoClickerCircle = new ImageButton(this);
         autoClickerCircle.setImageBitmap(createAutoClickerBitmap());
-        
+
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#3F51B5"));
@@ -388,13 +445,13 @@ public class MainActivity extends BridgeActivity {
         autoClickerCircle.setBackground(drawable);
         autoClickerCircle.setPadding(25, 25, 25, 25);
         autoClickerCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        
+
         autoClickerParams = new WindowManager.LayoutParams(120, 120, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         autoClickerParams.gravity = Gravity.TOP | Gravity.START;
         autoClickerParams.x = 250;
         autoClickerParams.y = 300;
-        
+
         autoClickerCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -422,7 +479,7 @@ public class MainActivity extends BridgeActivity {
             }
             return false;
         });
-        
+
         windowManager.addView(autoClickerCircle, autoClickerParams);
         isAutoClickerCircleVisible = true;
         Toast.makeText(this, "🖱️ Кружок автокликера создан", Toast.LENGTH_SHORT).show();
@@ -434,6 +491,14 @@ public class MainActivity extends BridgeActivity {
             autoClickerCircle = null;
             isAutoClickerCircleVisible = false;
         }
+        // Удаляем все точки автокликера
+        for (ClickPoint point : clickPoints) {
+            if (point.view != null && windowManager != null) {
+                windowManager.removeView(point.view);
+            }
+        }
+        clickPoints.clear();
+        pointCounter = 1;
     }
 
     private Bitmap createAutoClickerBitmap() {
@@ -454,62 +519,64 @@ public class MainActivity extends BridgeActivity {
         return b;
     }
 
-    // ========== МЕНЮ АВТОКЛИКЕРА ==========
+    // ===== МЕНЮ АВТОКЛИКЕРА (С ТОЧКАМИ) =====
     private void showAutoClickerMenu() {
         if (isAutoClickerMenuOpen) return;
         isAutoClickerMenuOpen = true;
-        
+
         PopupWindow popup = new PopupWindow(this);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(Color.parseColor("#1E1E1E"));
         layout.setPadding(30, 20, 30, 20);
-        
+
         TextView title = new TextView(this);
         title.setText("🖱️ Автокликер");
         title.setTextColor(Color.WHITE);
         title.setTextSize(22);
         layout.addView(title);
-        
+
+        // Кнопка "Добавить точку"
         Button addBtn = new Button(this);
         addBtn.setText("➕ Добавить точку");
         addBtn.setTextColor(Color.WHITE);
         addBtn.setBackgroundColor(Color.parseColor("#3F51B5"));
         addBtn.setOnClickListener(v -> {
-            clickPoints.add(new float[]{200 + pointCounter * 50, 300 + pointCounter * 30});
-            Toast.makeText(this, "Точка " + pointCounter + " добавлена", Toast.LENGTH_SHORT).show();
-            pointCounter++;
+            addClickPoint();
             popup.dismiss();
             isAutoClickerMenuOpen = false;
         });
         layout.addView(addBtn);
-        
+
+        // Настройка интервала
         LinearLayout intLayout = new LinearLayout(this);
         intLayout.setOrientation(LinearLayout.HORIZONTAL);
         EditText intervalInput = new EditText(this);
-        intervalInput.setHint("Интервал");
+        intervalInput.setHint("Интервал (мс)");
         intervalInput.setTextColor(Color.WHITE);
         intervalInput.setHintTextColor(Color.GRAY);
         intervalInput.setBackgroundColor(Color.parseColor("#333333"));
         intervalInput.setPadding(15, 10, 15, 10);
         intervalInput.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        intervalInput.setText("1000");
+        intervalInput.setText(String.valueOf(clickInterval));
         intLayout.addView(intervalInput);
-        
-        String[] units = {"мс", "сек", "мин"};
-        for (String unit : units) {
-            Button ub = new Button(this);
-            ub.setText(unit);
-            ub.setTextColor(Color.WHITE);
-            ub.setBackgroundColor(Color.parseColor("#555555"));
-            ub.setOnClickListener(v -> {
-                intervalUnit = unit;
-                Toast.makeText(this, "Единица: " + unit, Toast.LENGTH_SHORT).show();
-            });
-            intLayout.addView(ub);
-        }
+
+        Button saveIntervalBtn = new Button(this);
+        saveIntervalBtn.setText("✅");
+        saveIntervalBtn.setTextColor(Color.WHITE);
+        saveIntervalBtn.setBackgroundColor(Color.parseColor("#555555"));
+        saveIntervalBtn.setOnClickListener(v -> {
+            try {
+                clickInterval = Integer.parseInt(intervalInput.getText().toString());
+                Toast.makeText(this, "Интервал: " + clickInterval + " мс", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "Введите число", Toast.LENGTH_SHORT).show();
+            }
+        });
+        intLayout.addView(saveIntervalBtn);
         layout.addView(intLayout);
-        
+
+        // Кнопка "Запустить/Остановить"
         Button startBtn = new Button(this);
         startBtn.setText(isAutoClickerActive ? "⏹ Остановить" : "▶ Запустить");
         startBtn.setTextColor(Color.WHITE);
@@ -520,14 +587,10 @@ public class MainActivity extends BridgeActivity {
                 startBtn.setText("▶ Запустить");
                 Toast.makeText(this, "Автокликер остановлен", Toast.LENGTH_SHORT).show();
             } else {
-                try {
-                    int val = Integer.parseInt(intervalInput.getText().toString());
-                    switch (intervalUnit) {
-                        case "мс": clickInterval = val; break;
-                        case "сек": clickInterval = val * 1000; break;
-                        case "мин": clickInterval = val * 60 * 1000; break;
-                    }
-                } catch (Exception e) {}
+                if (clickPoints.isEmpty()) {
+                    Toast.makeText(this, "Добавьте хотя бы одну точку", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 startAutoClicker();
                 startBtn.setText("⏹ Остановить");
                 Toast.makeText(this, "Автокликер запущен", Toast.LENGTH_SHORT).show();
@@ -536,12 +599,19 @@ public class MainActivity extends BridgeActivity {
             isAutoClickerMenuOpen = false;
         });
         layout.addView(startBtn);
-        
+
+        // Кнопка "Очистить точки"
         Button clearBtn = new Button(this);
         clearBtn.setText("🗑 Очистить точки");
         clearBtn.setTextColor(Color.WHITE);
         clearBtn.setBackgroundColor(Color.parseColor("#DD2C00"));
         clearBtn.setOnClickListener(v -> {
+            // Удаляем все точки с экрана
+            for (ClickPoint point : clickPoints) {
+                if (point.view != null && windowManager != null) {
+                    windowManager.removeView(point.view);
+                }
+            }
             clickPoints.clear();
             pointCounter = 1;
             Toast.makeText(this, "Все точки удалены", Toast.LENGTH_SHORT).show();
@@ -549,7 +619,7 @@ public class MainActivity extends BridgeActivity {
             isAutoClickerMenuOpen = false;
         });
         layout.addView(clearBtn);
-        
+
         Button closeBtn = new Button(this);
         closeBtn.setText("✕ Закрыть");
         closeBtn.setTextColor(Color.WHITE);
@@ -559,9 +629,9 @@ public class MainActivity extends BridgeActivity {
             isAutoClickerMenuOpen = false;
         });
         layout.addView(closeBtn);
-        
+
         popup.setContentView(layout);
-        popup.setWidth(400);
+        popup.setWidth(450);
         popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         popup.setBackgroundDrawable(new GradientDrawable());
         popup.setOutsideTouchable(true);
@@ -569,15 +639,132 @@ public class MainActivity extends BridgeActivity {
         popup.setOnDismissListener(() -> isAutoClickerMenuOpen = false);
     }
 
-    // ========== КРУЖОК ЗАПИСИ ЭКРАНА ==========
+    // ===== ДОБАВЛЕНИЕ ТОЧКИ НА ЭКРАН =====
+    private void addClickPoint() {
+        int flag = getOverlayFlag();
+        final int pointId = pointCounter++;
+
+        FrameLayout pointView = new FrameLayout(this);
+        pointView.setBackground(createCircleBackground("#FF5722"));
+        pointView.setPadding(10, 10, 10, 10);
+
+        TextView numText = new TextView(this);
+        numText.setText(String.valueOf(pointId));
+        numText.setTextColor(Color.WHITE);
+        numText.setTextSize(18);
+        numText.setPadding(8, 4, 8, 4);
+        pointView.addView(numText);
+
+        WindowManager.LayoutParams pointParams = new WindowManager.LayoutParams(
+                70, 70,
+                flag,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+        );
+        pointParams.gravity = Gravity.TOP | Gravity.START;
+        pointParams.x = 300 + pointId * 20;
+        pointParams.y = 400 + pointId * 15;
+
+        // Перетаскивание точки
+        final float[] pStartX = new float[1];
+        final float[] pStartY = new float[1];
+        final int[] pInitX = new int[1];
+        final int[] pInitY = new int[1];
+        final boolean[] pIsDragging = new boolean[1];
+
+        pointView.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    pStartX[0] = event.getRawX();
+                    pStartY[0] = event.getRawY();
+                    pInitX[0] = pointParams.x;
+                    pInitY[0] = pointParams.y;
+                    pIsDragging[0] = false;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - pStartX[0];
+                    float dy = event.getRawY() - pStartY[0];
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) pIsDragging[0] = true;
+                    pointParams.x = pInitX[0] + (int) dx;
+                    pointParams.y = pInitY[0] + (int) dy;
+                    if (windowManager != null) {
+                        windowManager.updateViewLayout(pointView, pointParams);
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!pIsDragging[0]) {
+                        // Удаляем точку по нажатию
+                        removeClickPoint(pointId, pointView);
+                    }
+                    return true;
+            }
+            return false;
+        });
+
+        ClickPoint newPoint = new ClickPoint(pointParams.x, pointParams.y, pointId);
+        newPoint.view = pointView;
+        clickPoints.add(newPoint);
+
+        if (windowManager != null) {
+            windowManager.addView(pointView, pointParams);
+        }
+
+        Toast.makeText(this, "Точка " + pointId + " добавлена (перетащи, нажми для удаления)", Toast.LENGTH_SHORT).show();
+    }
+
+    private void removeClickPoint(int id, View view) {
+        if (windowManager != null && view != null) {
+            windowManager.removeView(view);
+        }
+        for (int i = 0; i < clickPoints.size(); i++) {
+            if (clickPoints.get(i).id == id) {
+                clickPoints.remove(i);
+                break;
+            }
+        }
+        Toast.makeText(this, "Точка " + id + " удалена", Toast.LENGTH_SHORT).show();
+    }
+
+    // ===== ЛОГИКА АВТОКЛИКЕРА =====
+    private void startAutoClicker() {
+        if (clickPoints.isEmpty()) {
+            Toast.makeText(this, "Нет точек для кликов", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        isAutoClickerActive = true;
+        autoClickTimer = new Timer();
+        autoClickTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (!isAutoClickerActive) return;
+                runOnUiThread(() -> {
+                    // Здесь должна быть эмуляция клика через AccessibilityService
+                    // Пока просто показываем тост для демонстрации
+                    for (ClickPoint point : clickPoints) {
+                        Toast.makeText(MainActivity.this, "Клик в (" + (int) point.x + ", " + (int) point.y + ")", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }, 0, clickInterval);
+    }
+
+    private void stopAutoClicker() {
+        isAutoClickerActive = false;
+        if (autoClickTimer != null) {
+            autoClickTimer.cancel();
+            autoClickTimer = null;
+        }
+    }
+
+    // ===== КРУЖОК ЗАПИСИ ЭКРАНА =====
     private void showRecordCircle() {
         if (isRecordCircleVisible) return;
-        
+
         int flag = getOverlayFlag();
-        
+
         recordCircle = new ImageButton(this);
         recordCircle.setImageBitmap(createRecordBitmap());
-        
+
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.OVAL);
         drawable.setColor(Color.parseColor("#E53935"));
@@ -585,13 +772,13 @@ public class MainActivity extends BridgeActivity {
         recordCircle.setBackground(drawable);
         recordCircle.setPadding(25, 25, 25, 25);
         recordCircle.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        
+
         recordParams = new WindowManager.LayoutParams(120, 120, flag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         recordParams.gravity = Gravity.TOP | Gravity.START;
         recordParams.x = 400;
         recordParams.y = 300;
-        
+
         recordCircle.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -619,7 +806,7 @@ public class MainActivity extends BridgeActivity {
             }
             return false;
         });
-        
+
         windowManager.addView(recordCircle, recordParams);
         isRecordCircleVisible = true;
         Toast.makeText(this, "🎥 Кружок записи экрана создан", Toast.LENGTH_SHORT).show();
@@ -649,31 +836,31 @@ public class MainActivity extends BridgeActivity {
         return b;
     }
 
-    // ========== МЕНЮ ЗАПИСИ ЭКРАНА ==========
+    // ===== МЕНЮ ЗАПИСИ ЭКРАНА =====
     private void showRecordMenu() {
         if (isRecordMenuOpen) return;
         isRecordMenuOpen = true;
-        
+
         PopupWindow popup = new PopupWindow(this);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(Color.parseColor("#1E1E1E"));
         layout.setPadding(30, 20, 30, 20);
-        
+
         TextView title = new TextView(this);
         title.setText("🎥 Запись экрана");
         title.setTextColor(Color.WHITE);
         title.setTextSize(22);
         layout.addView(title);
-        
+
         recordTimerText = new TextView(this);
         recordTimerText.setText("00:00");
         recordTimerText.setTextColor(Color.WHITE);
-        recordTimerText.setTextSize(24);
+        recordTimerText.setTextSize(30);
         recordTimerText.setGravity(Gravity.CENTER);
         recordTimerText.setPadding(0, 10, 0, 10);
         layout.addView(recordTimerText);
-        
+
         LinearLayout delayLayout = new LinearLayout(this);
         delayLayout.setOrientation(LinearLayout.HORIZONTAL);
         int[] delays = {0, 5, 10, 15, 30};
@@ -686,7 +873,7 @@ public class MainActivity extends BridgeActivity {
             int d = delays[i];
             db.setOnClickListener(v -> {
                 if (!isRecording) {
-                    startRecording(d);
+                    startScreenRecording(d);
                     popup.dismiss();
                     isRecordMenuOpen = false;
                 }
@@ -694,31 +881,31 @@ public class MainActivity extends BridgeActivity {
             delayLayout.addView(db);
         }
         layout.addView(delayLayout);
-        
+
         if (isRecording) {
             Button pauseBtn = new Button(this);
             pauseBtn.setText("⏸ Пауза");
             pauseBtn.setTextColor(Color.WHITE);
             pauseBtn.setBackgroundColor(Color.parseColor("#FF9800"));
             pauseBtn.setOnClickListener(v -> {
-                Toast.makeText(this, "Пауза", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Пауза (функция в разработке)", Toast.LENGTH_SHORT).show();
                 popup.dismiss();
                 isRecordMenuOpen = false;
             });
             layout.addView(pauseBtn);
-            
+
             Button stopBtn = new Button(this);
             stopBtn.setText("⏹ Остановить");
             stopBtn.setTextColor(Color.WHITE);
             stopBtn.setBackgroundColor(Color.parseColor("#DD2C00"));
             stopBtn.setOnClickListener(v -> {
-                stopRecording();
+                stopScreenRecording();
                 popup.dismiss();
                 isRecordMenuOpen = false;
             });
             layout.addView(stopBtn);
         }
-        
+
         Button closeBtn = new Button(this);
         closeBtn.setText("✕ Закрыть");
         closeBtn.setTextColor(Color.WHITE);
@@ -728,9 +915,9 @@ public class MainActivity extends BridgeActivity {
             isRecordMenuOpen = false;
         });
         layout.addView(closeBtn);
-        
+
         popup.setContentView(layout);
-        popup.setWidth(400);
+        popup.setWidth(450);
         popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         popup.setBackgroundDrawable(new GradientDrawable());
         popup.setOutsideTouchable(true);
@@ -738,48 +925,81 @@ public class MainActivity extends BridgeActivity {
         popup.setOnDismissListener(() -> isRecordMenuOpen = false);
     }
 
-    // ========== ЛОГИКА АВТОКЛИКЕРА ==========
-    private void startAutoClicker() {
-        if (clickPoints.isEmpty()) {
-            Toast.makeText(this, "Нет точек для кликов", Toast.LENGTH_SHORT).show();
+    // ===== ЛОГИКА ЗАПИСИ ЭКРАНА =====
+    private void startScreenRecording(int delay) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Intent intent = projectionManager.createScreenCaptureIntent();
+            startActivityForResult(intent, REQUEST_SCREEN_RECORD);
+        }
+
+        if (delay > 0) {
+            Toast.makeText(this, "Запись начнется через " + delay + " секунд", Toast.LENGTH_SHORT).show();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                startRecording();
+            }, delay * 1000);
+        } else {
+            startRecording();
+        }
+    }
+
+    private void startRecording() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && mediaProjection == null) {
+            Toast.makeText(this, "Сначала разрешите запись экрана", Toast.LENGTH_SHORT).show();
             return;
         }
-        isAutoClickerActive = true;
-        autoClickTimer = new Timer();
-        autoClickTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                if (!isAutoClickerActive) return;
-                runOnUiThread(() -> {
-                    for (float[] p : clickPoints) {
-                        Toast.makeText(MainActivity.this, "Клик в (" + (int)p[0] + ", " + (int)p[1] + ")", Toast.LENGTH_SHORT).show();
-                    }
-                });
+
+        // Получаем размеры экрана
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        screenWidth = metrics.widthPixels;
+        screenHeight = metrics.heightPixels;
+        screenDensity = metrics.densityDpi;
+
+        // Создаем файл для записи
+        File movieDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+        if (!movieDir.exists()) {
+            movieDir.mkdirs();
+        }
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        recordFilePath = new File(movieDir, "REC_" + timeStamp + ".mp4").getAbsolutePath();
+
+        try {
+            mediaRecorder = new MediaRecorder();
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            mediaRecorder.setOutputFile(recordFilePath);
+            mediaRecorder.setVideoSize(screenWidth, screenHeight);
+            mediaRecorder.setVideoFrameRate(30);
+            mediaRecorder.setVideoEncodingBitRate(2000000);
+            mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            mediaRecorder.prepare();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                virtualDisplay = mediaProjection.createVirtualDisplay(
+                        "ScreenRecording",
+                        screenWidth, screenHeight, screenDensity,
+                        DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                        mediaRecorder.getSurface(),
+                        null, null
+                );
             }
-        }, 0, clickInterval);
-    }
 
-    private void stopAutoClicker() {
-        isAutoClickerActive = false;
-        if (autoClickTimer != null) {
-            autoClickTimer.cancel();
-            autoClickTimer = null;
+            mediaRecorder.start();
+            isRecording = true;
+            recordSeconds = 0;
+            startRecordTimer();
+
+            Toast.makeText(this, "Запись начата, видео сохранится в папку Movies", Toast.LENGTH_LONG).show();
+
+        } catch (IOException | RuntimeException e) {
+            Log.e(TAG, "Ошибка записи: " + e.getMessage());
+            Toast.makeText(this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            mediaRecorder = null;
         }
     }
 
-    // ========== ЛОГИКА ЗАПИСИ ==========
-    private void startRecording(int delay) {
-        if (delay > 0) {
-            Toast.makeText(this, "Запись через " + delay + " сек", Toast.LENGTH_SHORT).show();
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::startRecordingNow, delay * 1000);
-        } else {
-            startRecordingNow();
-        }
-    }
-
-    private void startRecordingNow() {
-        isRecording = true;
-        recordSeconds = 0;
+    private void startRecordTimer() {
         if (recordTimer != null) recordTimer.cancel();
         recordTimer = new Timer();
         recordTimer.schedule(new TimerTask() {
@@ -796,22 +1016,82 @@ public class MainActivity extends BridgeActivity {
                 });
             }
         }, 1000, 1000);
-        Toast.makeText(this, "Запись начата", Toast.LENGTH_SHORT).show();
     }
 
-    private void stopRecording() {
-        isRecording = false;
-        if (recordTimer != null) {
-            recordTimer.cancel();
-            recordTimer = null;
+    private void stopScreenRecording() {
+        if (isRecording) {
+            if (mediaRecorder != null) {
+                try {
+                    mediaRecorder.stop();
+                    mediaRecorder.reset();
+                    mediaRecorder.release();
+                    mediaRecorder = null;
+                } catch (Exception e) {
+                    Log.e(TAG, "Ошибка остановки записи: " + e.getMessage());
+                }
+            }
+            if (virtualDisplay != null) {
+                virtualDisplay.release();
+                virtualDisplay = null;
+            }
+            if (mediaProjection != null) {
+                mediaProjection.stop();
+                mediaProjection = null;
+            }
+            isRecording = false;
+            if (recordTimer != null) {
+                recordTimer.cancel();
+                recordTimer = null;
+            }
+            if (recordTimerText != null) {
+                recordTimerText.setText("00:00");
+            }
+
+            // Сохраняем в галерею
+            saveVideoToGallery();
+
+            Toast.makeText(this, "Запись остановлена. Видео сохранено в галерею", Toast.LENGTH_LONG).show();
         }
-        if (recordTimerText != null) {
-            recordTimerText.setText("00:00");
-        }
-        Toast.makeText(this, "Запись остановлена", Toast.LENGTH_SHORT).show();
     }
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
+    private void saveVideoToGallery() {
+        if (recordFilePath == null || recordFilePath.isEmpty()) return;
+
+        try {
+            File videoFile = new File(recordFilePath);
+            if (!videoFile.exists()) return;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES);
+                values.put(MediaStore.Video.Media.DISPLAY_NAME, videoFile.getName());
+                values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                values.put(MediaStore.Video.Media.IS_PENDING, 1);
+
+                Uri uri = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    getContentResolver().openOutputStream(uri).close();
+                    values.clear();
+                    values.put(MediaStore.Video.Media.IS_PENDING, 0);
+                    getContentResolver().update(uri, values, null, null);
+                    Toast.makeText(this, "Видео сохранено в галерею", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                // Для старых версий файл уже сохранен в Movies, галерея сама его найдет
+                Toast.makeText(this, "Видео сохранено в папку Movies", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка сохранения видео: " + e.getMessage());
+        }
+    }
+
+    // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
+    private int getOverlayFlag() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
+                WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
     private ImageButton createCircleButton(Drawable icon, String color) {
         ImageButton btn = new ImageButton(this);
         btn.setImageDrawable(icon);
@@ -823,6 +1103,14 @@ public class MainActivity extends BridgeActivity {
         btn.setPadding(20, 20, 20, 20);
         btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
         return btn;
+    }
+
+    private Drawable createCircleBackground(String color) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(Color.parseColor(color));
+        d.setStroke(4, Color.WHITE);
+        return d;
     }
 
     private Drawable createAutoClickerIcon() {
@@ -903,7 +1191,7 @@ public class MainActivity extends BridgeActivity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
-    // ========== ЖИЗНЕННЫЙ ЦИКЛ ==========
+    // ===== ЖИЗНЕННЫЙ ЦИКЛ =====
     @Override
     public void onResume() {
         super.onResume();
@@ -917,6 +1205,21 @@ public class MainActivity extends BridgeActivity {
         super.onPause();
         if (mainCircle != null && !isMainOverlayVisible) {
             mainCircle.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_SCREEN_RECORD) {
+            if (resultCode == Activity.RESULT_OK && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mediaProjection = projectionManager.getMediaProjection(resultCode, data);
+                Toast.makeText(this, "Разрешение на запись экрана получено", Toast.LENGTH_SHORT).show();
+                // Пользователь разрешил, теперь можно начать запись
+                // Запись начнется из метода startRecording()
+            } else {
+                Toast.makeText(this, "Запись экрана не разрешена", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -937,12 +1240,19 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         super.onDestroy();
         stopAutoClicker();
-        stopRecording();
+        stopScreenRecording();
         hideMainOverlay();
         hideAutoClickerCircle();
         hideRecordCircle();
         if (mainCircle != null && windowManager != null) {
             windowManager.removeView(mainCircle);
         }
+        // Удаляем точки
+        for (ClickPoint point : clickPoints) {
+            if (point.view != null && windowManager != null) {
+                windowManager.removeView(point.view);
+            }
+        }
+        clickPoints.clear();
     }
             }
