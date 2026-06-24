@@ -447,6 +447,10 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!isDragging) {
+                        if (!isAccessibilityServiceEnabled()) {
+                            requestAccessibilityPermission();
+                            return true;
+                        }
                         showAutoClickerMenu();
                     }
                     return true;
@@ -1058,4 +1062,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-                        }
+                           }
