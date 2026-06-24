@@ -54,7 +54,6 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     private static final int REQUEST_SCREEN_RECORD = 103;
     private static final int REQUEST_ACCESSIBILITY = 105;
-    private static final int REQUEST_NOTIFICATIONS = 106;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -105,8 +104,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // ===== ЗАПРАШИВАЕМ ВСЕ РАЗРЕШЕНИЯ (по очереди) =====
-        requestPermissionsIfNeeded();
+        // ===== ЗАПРАШИВАЕМ ВСЕ РАЗРЕШЕНИЯ =====
+        requestAllPermissions();
 
         // Проверка автокликера
         if (!isAccessibilityServiceEnabled()) {
@@ -126,9 +125,6 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // Запуск Foreground Service для голоса (после получения разрешений)
-        startVoiceService();
-
         // Для записи экрана
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
 
@@ -146,9 +142,9 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ЗАПРОС ВСЕХ РАЗРЕШЕНИЙ =====
-    private void requestPermissionsIfNeeded() {
-        ArrayList<String> permissions = new ArrayList<>();
+    // ===== ЗАПРОС РАЗРЕШЕНИЙ (БЕЗ ЗАПУСКА СЕРВИСА) =====
+    private void requestAllPermissions() {
+        java.util.ArrayList<String> permissions = new java.util.ArrayList<>();
 
         // Микрофон
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -182,17 +178,6 @@ public class MainActivity extends BridgeActivity {
             ActivityCompat.requestPermissions(this,
                     permissions.toArray(new String[0]),
                     REQUEST_MICROPHONE);
-        } else {
-            // Если все разрешения уже есть
-            startVoiceService();
-        }
-    }
-
-    private void startVoiceService() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED) {
-            Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
-            ContextCompat.startForegroundService(this, serviceIntent);
         }
     }
 
@@ -487,6 +472,10 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!isDragging) {
+                        if (!isAccessibilityServiceEnabled()) {
+                            requestAccessibilityPermission();
+                            return true;
+                        }
                         showAutoClickerMenu();
                     }
                     return true;
@@ -1089,7 +1078,6 @@ public class MainActivity extends BridgeActivity {
             
             if (hasMicrophone) {
                 Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-                startVoiceService();
             } else {
                 Toast.makeText(this, "🎤 Микрофон НЕ разрешён, голосовой чат не будет работать", Toast.LENGTH_LONG).show();
             }
@@ -1121,4 +1109,4 @@ public class MainActivity extends BridgeActivity {
         hideAutoClickerCircle();
         hideRecordCircle();
     }
-                                              }
+            }
