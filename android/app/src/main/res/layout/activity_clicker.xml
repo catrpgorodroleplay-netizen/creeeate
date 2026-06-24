@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1A1A2E"
+    android:padding="20dp">
+
+    <!-- Заголовок -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🖱️ АВТОКЛИКЕР"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="20dp"/>
+
+    <!-- Статус (количество точек) -->
+    <TextView
+        android:id="@+id/tvPointsCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Точек: 0"
+        android:textSize="18sp"
+        android:textColor="#AAAAAA"
+        android:gravity="center"
+        android:padding="10dp"/>
+
+    <!-- Поле для ввода интервала -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="10dp">
+
+        <EditText
+            android:id="@+id/etInterval"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Интервал"
+            android:text="1000"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888"
+            android:background="#333344"
+            android:padding="15dp"
+            android:inputType="number"/>
+
+        <Spinner
+            android:id="@+id/spinnerUnit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#333344"
+            android:padding="10dp"/>
+    </LinearLayout>
+
+    <!-- Сетка кнопок -->
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2"
+        android:padding="10dp">
+
+        <Button
+            android:id="@+id/btnAddPoint"
+            android:text="➕ ДОБАВИТЬ ТОЧКУ"
+            android:textColor="#FFFFFF"
+            android:background="#3F51B5"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
+            android:id="@+id/btnClearPoints"
+            android:text="🗑 ОЧИСТИТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#E53935"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
+            android:id="@+id/btnStartStop"
+            android:text="▶ ЗАПУСТИТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#4CAF50"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
+            android:id="@+id/btnClose"
+            android:text="✕ ЗАКРЫТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#555555"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+    </GridLayout>
+
+    <!-- Список точек (для отображения) -->
+    <TextView
+        android:id="@+id/tvPointsList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Точки:"
+        android:textColor="#AAAAAA"
+        android:padding="10dp"/>
+
+</LinearLayout>
