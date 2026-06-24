@@ -2,6 +2,7 @@ package com.voice.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -52,6 +53,7 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
     private static final int REQUEST_SCREEN_RECORD = 103;
+    private static final int REQUEST_ACCESSIBILITY = 105;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -102,19 +104,21 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Разрешения
+        // ===== РАЗРЕШЕНИЯ =====
+        // Микрофон
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
         }
+        // Камера
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
         }
 
-        // Разрешение на оверлей
+        // Разрешение на оверлей (плавающие окна)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -127,7 +131,10 @@ public class MainActivity extends BridgeActivity {
             createMainCircle();
         }
 
-        // Foreground Service для голоса
+        // Проверка Accessibility для автокликера (НО НЕ БЛОКИРУЕТ ЗАПУСК)
+        checkAccessibilityPermission();
+
+        // Запуск Foreground Service для голоса
         Intent serviceIntent = new Intent(this, VoiceForegroundService.class);
         ContextCompat.startForegroundService(this, serviceIntent);
 
@@ -146,6 +153,37 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+    }
+
+    // ===== ПРОВЕРКА ACCESSIBILITY =====
+    private void checkAccessibilityPermission() {
+        if (!isAccessibilityServiceEnabled()) {
+            // Просто предупреждаем, но НЕ БЛОКИРУЕМ
+            Toast.makeText(this, "Для автокликера включите его в настройках специальных возможностей", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private boolean isAccessibilityServiceEnabled() {
+        String service = getPackageName() + "/" + ClickAccessibilityService.class.getCanonicalName();
+        try {
+            String enabledServices = Settings.Secure.getString(getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            return enabledServices != null && enabledServices.contains(service);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void requestAccessibilityPermission() {
+        new AlertDialog.Builder(this)
+            .setTitle("Включите автокликер")
+            .setMessage("Для работы автокликера нужно включить его в настройках специальных возможностей.\n\nПосле включения вернитесь в приложение.")
+            .setPositiveButton("Перейти в настройки", (dialog, which) -> {
+                Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                startActivityForResult(intent, REQUEST_ACCESSIBILITY);
+            })
+            .setNegativeButton("Отмена", null)
+            .show();
     }
 
     // ===== ГЛАВНЫЙ КРУЖОК =====
@@ -458,6 +496,13 @@ public class MainActivity extends BridgeActivity {
         if (isAutoClickerMenuOpen) return;
         isAutoClickerMenuOpen = true;
 
+        // Проверяем, включен ли AccessibilityService
+        if (!isAccessibilityServiceEnabled()) {
+            requestAccessibilityPermission();
+            isAutoClickerMenuOpen = false;
+            return;
+        }
+
         PopupWindow popup = new PopupWindow(this);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -651,6 +696,10 @@ public class MainActivity extends BridgeActivity {
     private void startAutoClicker() {
         if (clickPoints.isEmpty()) {
             Toast.makeText(this, "Нет точек для кликов", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isAccessibilityServiceEnabled()) {
+            requestAccessibilityPermission();
             return;
         }
         isAutoClickerActive = true;
@@ -957,6 +1006,12 @@ public class MainActivity extends BridgeActivity {
                 Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Запись экрана не разрешена", Toast.LENGTH_SHORT).show();
+            }
+        }
+        if (requestCode == REQUEST_ACCESSIBILITY) {
+            // Проверяем, включил ли пользователь
+            if (isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "Автокликер включен!", Toast.LENGTH_SHORT).show();
             }
         }
     }
