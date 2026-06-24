@@ -12,7 +12,6 @@ import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.GridLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -21,6 +20,8 @@ import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import com.voice.app.ClickAccessibilityService.ClickPoint;
 
 public class ClickerActivity extends AppCompatActivity {
 
@@ -35,15 +36,6 @@ public class ClickerActivity extends AppCompatActivity {
     private Spinner spinnerUnit;
     private Button btnAddPoint, btnClearPoints, btnStartStop, btnClose;
 
-    private class ClickPoint {
-        float x, y;
-        View view;
-        ClickPoint(float x, float y) {
-            this.x = x;
-            this.y = y;
-        }
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,6 +44,7 @@ public class ClickerActivity extends AppCompatActivity {
         initViews();
         setupListeners();
         checkAccessibility();
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     }
 
     private void initViews() {
@@ -64,12 +57,9 @@ public class ClickerActivity extends AppCompatActivity {
         btnStartStop = findViewById(R.id.btnStartStop);
         btnClose = findViewById(R.id.btnClose);
 
-        // Настройка Spinner
         String[] units = {"Миллисекунды", "Секунды", "Минуты"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
         spinnerUnit.setAdapter(adapter);
-
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     }
 
     private void setupListeners() {
@@ -104,9 +94,7 @@ public class ClickerActivity extends AppCompatActivity {
         final ClickPoint newPoint = new ClickPoint(500, 500);
         clickPoints.add(newPoint);
 
-        // Создаём плавающую точку
         View pointView = new View(this);
-        pointView.setBackground(ContextCompat.getDrawable(this, R.drawable.circle_point)); // Нужно создать drawable
         pointView.setBackgroundColor(0xFFFF0000);
         
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -177,7 +165,6 @@ public class ClickerActivity extends AppCompatActivity {
             return;
         }
 
-        // Получаем интервал
         try {
             int val = Integer.parseInt(etInterval.getText().toString());
             int pos = spinnerUnit.getSelectedItemPosition();
@@ -201,6 +188,7 @@ public class ClickerActivity extends AppCompatActivity {
             public void run() {
                 runOnUiThread(() -> {
                     if (!isActive) return;
+                    // Исправлено: передаём ArrayList<ClickPoint>
                     ClickAccessibilityService.performClick(clickPoints);
                 });
             }
@@ -230,4 +218,4 @@ public class ClickerActivity extends AppCompatActivity {
             }
         }
     }
-                        }
+                }
