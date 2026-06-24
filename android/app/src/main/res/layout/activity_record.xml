@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1A1A2E"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎥 ЗАПИСЬ ЭКРАНА"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="20dp"/>
+
+    <TextView
+        android:id="@+id/tvRecordStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⏸ Готов к записи"
+        android:textSize="20sp"
+        android:textColor="#AAAAAA"
+        android:gravity="center"
+        android:padding="20dp"/>
+
+    <TextView
+        android:id="@+id/tvRecordTimer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="00:00"
+        android:textSize="48sp"
+        android:textColor="#4CAF50"
+        android:gravity="center"
+        android:padding="20dp"/>
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2"
+        android:padding="10dp">
+
+        <Button
+            android:id="@+id/btnStartRecord"
+            android:text="▶ НАЧАТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#4CAF50"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
+            android:id="@+id/btnStopRecord"
+            android:text="⏹ ОСТАНОВИТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#E53935"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+
+        <Button
+            android:id="@+id/btnCloseRecord"
+            android:text="✕ ЗАКРЫТЬ"
+            android:textColor="#FFFFFF"
+            android:background="#555555"
+            android:padding="15dp"
+            android:layout_margin="5dp"/>
+    </GridLayout>
+
+</LinearLayout>
