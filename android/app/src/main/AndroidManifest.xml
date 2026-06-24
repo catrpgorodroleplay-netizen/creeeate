@@ -14,15 +14,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
-    <!-- ФОНОВАЯ РАБОТА (ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 14+) -->
+    <!-- ФОНОВАЯ РАБОТА -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
-    <!-- УВЕДОМЛЕНИЯ (ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 13+) -->
+    <!-- УВЕДОМЛЕНИЯ (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
-    <!-- ДОПОЛНИТЕЛЬНЫЕ РАЗРЕШЕНИЯ -->
+    <!-- ДОПОЛНИТЕЛЬНЫЕ -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -56,15 +56,15 @@
             </intent-filter>
         </activity>
 
-        <!-- АВТОКЛИКЕР -->
+        <!-- АВТОКЛИКЕР (ОВЕРЛЕЙ) -->
         <activity
-            android:name=".ClickerActivity"
+            android:name=".ClickerOverlayActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
 
-        <!-- ЗАПИСЬ ЭКРАНА -->
+        <!-- ЗАПИСЬ ЭКРАНА (ОВЕРЛЕЙ) -->
         <activity
-            android:name=".RecordActivity"
+            android:name=".RecordOverlayActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
 
@@ -89,13 +89,12 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
-        <!-- СЕРВИС ДЛЯ ГОЛОСОВОГО ЧАТА (С МИКРОФОНОМ) -->
+        <!-- СЕРВИС ДЛЯ ГОЛОСА -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
-        <!-- СЕРВИС CAPACITOR ДЛЯ СОВМЕСТИМОСТИ -->
         <service
             android:name="com.getcapacitor.CapacitorForegroundService"
             android:foregroundServiceType="microphone"
