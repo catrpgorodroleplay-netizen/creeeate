@@ -5,7 +5,6 @@ import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.os.Build;
 import android.view.accessibility.AccessibilityEvent;
-
 import java.util.ArrayList;
 
 public class ClickAccessibilityService extends AccessibilityService {
