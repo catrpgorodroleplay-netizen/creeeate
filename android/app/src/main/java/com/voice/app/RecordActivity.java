@@ -17,28 +17,21 @@ public class RecordActivity extends AppCompatActivity {
     private TextView tvStatus, tvTimer;
     private Button btnStart, btnStop, btnClose;
     private MediaProjectionManager projectionManager;
-    private boolean isRecording = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_record);
 
-        initViews();
-        projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-        setupListeners();
-    }
-
-    private void initViews() {
         tvStatus = findViewById(R.id.tvRecordStatus);
         tvTimer = findViewById(R.id.tvRecordTimer);
         btnStart = findViewById(R.id.btnStartRecord);
         btnStop = findViewById(R.id.btnStopRecord);
         btnClose = findViewById(R.id.btnCloseRecord);
+        
+        projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         btnStop.setEnabled(false);
-    }
 
-    private void setupListeners() {
         btnStart.setOnClickListener(v -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 Intent intent = projectionManager.createScreenCaptureIntent();
@@ -51,7 +44,6 @@ public class RecordActivity extends AppCompatActivity {
                 Intent stopIntent = new Intent(this, ScreenRecordService.class);
                 stopIntent.setAction("STOP");
                 ContextCompat.startForegroundService(this, stopIntent);
-                isRecording = false;
                 btnStart.setEnabled(true);
                 btnStop.setEnabled(false);
                 tvStatus.setText("⏹ Запись остановлена");
@@ -72,11 +64,9 @@ public class RecordActivity extends AppCompatActivity {
                 serviceIntent.putExtra("resultCode", resultCode);
                 serviceIntent.putExtra("data", data);
                 ContextCompat.startForegroundService(this, serviceIntent);
-                isRecording = true;
                 btnStart.setEnabled(false);
                 btnStop.setEnabled(true);
                 tvStatus.setText("⏺ Идёт запись...");
-                tvTimer.setText("⏳ 00:00");
                 Toast.makeText(this, "Запись экрана начата", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Запись не разрешена", Toast.LENGTH_SHORT).show();
@@ -88,7 +78,6 @@ public class RecordActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (ScreenRecordService.isRunning) {
-            isRecording = true;
             btnStart.setEnabled(false);
             btnStop.setEnabled(true);
             tvStatus.setText("⏺ Идёт запись...");
