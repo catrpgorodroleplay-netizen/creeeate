@@ -9,6 +9,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 public class OverlayCharacterManager {
 
@@ -26,14 +27,39 @@ public class OverlayCharacterManager {
     }
 
     public void loadCharacter(Bitmap characterBitmap) {
+        if (windowManager == null) {
+            if (context != null) {
+                Toast.makeText(context, "WindowManager не инициализирован", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
+        if (characterBitmap == null) {
+            if (context != null) {
+                Toast.makeText(context, "Ошибка: картинка не загружена", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
+        // Проверяем, что картинка не слишком большая
+        if (characterBitmap.getWidth() > 2000 || characterBitmap.getHeight() > 2000) {
+            Bitmap scaled = Bitmap.createScaledBitmap(characterBitmap, 800, 800, true);
+            characterBitmap = scaled;
+        }
+
         Bitmap processedBitmap = removeGreenScreen(characterBitmap);
         showCharacter(processedBitmap);
     }
 
     private void showCharacter(Bitmap bitmap) {
-        if (characterView != null) {
-            windowManager.removeView(characterView);
-        }
+        if (windowManager == null) return;
+
+        try {
+            if (characterView != null) {
+                windowManager.removeView(characterView);
+                characterView = null;
+            }
+        } catch (Exception ignored) {}
 
         characterView = new ImageView(context);
         characterView.setImageBitmap(bitmap);
@@ -45,14 +71,14 @@ public class OverlayCharacterManager {
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
 
         params = new WindowManager.LayoutParams(
-                200, 200,
+                250, 250,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 flags,
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 500;
-        params.y = 500;
+        params.x = 300;
+        params.y = 300;
 
         characterView.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -68,7 +94,9 @@ public class OverlayCharacterManager {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - startX);
                         params.y = initialY + (int) (event.getRawY() - startY);
-                        windowManager.updateViewLayout(characterView, params);
+                        try {
+                            windowManager.updateViewLayout(characterView, params);
+                        } catch (Exception ignored) {}
                         return true;
                     default:
                         return false;
@@ -76,10 +104,18 @@ public class OverlayCharacterManager {
             }
         });
 
-        windowManager.addView(characterView, params);
+        try {
+            windowManager.addView(characterView, params);
+        } catch (Exception e) {
+            if (context != null) {
+                Toast.makeText(context, "Ошибка отображения персонажа: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private Bitmap removeGreenScreen(Bitmap source) {
+        if (source == null) return null;
+
         int width = source.getWidth();
         int height = source.getHeight();
         Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
@@ -110,16 +146,20 @@ public class OverlayCharacterManager {
     }
 
     public void setSize(int width, int height) {
-        if (characterView != null) {
+        if (characterView != null && windowManager != null && params != null) {
             params.width = width;
             params.height = height;
-            windowManager.updateViewLayout(characterView, params);
+            try {
+                windowManager.updateViewLayout(characterView, params);
+            } catch (Exception ignored) {}
         }
     }
 
     public void removeCharacter() {
         if (characterView != null && windowManager != null) {
-            windowManager.removeView(characterView);
+            try {
+                windowManager.removeView(characterView);
+            } catch (Exception ignored) {}
             characterView = null;
         }
     }
