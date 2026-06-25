@@ -11,12 +11,9 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import com.github.dosgo.tun2socks.Tun2Socks;
+
 import java.net.InetSocketAddress;
-import java.nio.channels.DatagramChannel;
-import java.nio.channels.SocketChannel;
 
 public class VpnService extends android.net.VpnService implements Runnable {
 
@@ -28,14 +25,18 @@ public class VpnService extends android.net.VpnService implements Runnable {
 
     private ParcelFileDescriptor vpnInterface;
     private Thread vpnThread;
-    private DatagramChannel tunnel;
+    private Tun2Socks tun2Socks;
+
+    // === НАСТРОЙКИ ПРОКСИ (меняй здесь) ===
     private String proxyHost = "185.209.192.197";
     private int proxyPort = 443;
+    // =======================================
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        Log.d(TAG, "VpnService создан");
     }
 
     @Override
@@ -51,21 +52,24 @@ public class VpnService extends android.net.VpnService implements Runnable {
     }
 
     private void startVpn() {
-        if (isRunning) return;
+        if (isRunning) {
+            Log.d(TAG, "VPN уже запущен");
+            return;
+        }
 
         try {
-            // 1. Строим VPN-интерфейс — весь трафик через нас
+            // 1. Строим VPN-интерфейс
             Builder builder = new Builder();
             builder.setSession("VoiceApp VPN");
             builder.addAddress("10.0.0.2", 32);
-            builder.addRoute("0.0.0.0", 0);  // ВЕСЬ трафик
+            builder.addRoute("0.0.0.0", 0); // Весь трафик через VPN
             builder.addDnsServer("8.8.8.8");
             builder.addDnsServer("1.1.1.1");
             builder.setMtu(1500);
             builder.setBlocking(true);
 
-            // Добавляем исключения для приложений (опционально)
-            // builder.addDisallowedApplication("com.android.chrome");
+            // Разрешаем всем приложениям использовать VPN
+            // builder.addDisallowedApplication("com.android.chrome"); // можно исключить
 
             vpnInterface = builder.establish();
             if (vpnInterface == null) {
@@ -73,73 +77,88 @@ public class VpnService extends android.net.VpnService implements Runnable {
                 return;
             }
 
-            // 2. СОЗДАЁМ ТУННЕЛЬ К ПРОКСИ-СЕРВЕРУ
-            tunnel = DatagramChannel.open();
-            tunnel.connect(new InetSocketAddress(proxyHost, proxyPort));
-
-            // 3. ЗАЩИЩАЕМ ТУННЕЛЬ — это САМОЕ ВАЖНОЕ!
-            // Без этого пакеты будут зацикливаться
-            boolean protectedSocket = protect(tunnel.socket());
+            // 2. ЗАЩИЩАЕМ ТУННЕЛЬ
+            boolean protectedSocket = protect(vpnInterface.getFileDescriptor());
             if (!protectedSocket) {
-                Log.e(TAG, "Не удалось защитить сокет туннеля");
-                tunnel.close();
+                Log.e(TAG, "Не удалось защитить сокет");
                 vpnInterface.close();
+                vpnInterface = null;
                 return;
             }
 
             isRunning = true;
-            Log.d(TAG, "VPN запущен, трафик через " + proxyHost + ":" + proxyPort);
+            Log.d(TAG, "VPN запущен");
 
-            startForeground(NOTIFICATION_ID, createNotification("🛡️ VPN активен", "Трафик через прокси"));
+            // 3. ЗАПУСКАЕМ TUN2SOCKS
+            String proxyAddress = proxyHost + ":" + proxyPort;
+            tun2Socks = new Tun2Socks();
+            tun2Socks.startTun2Socks(
+                    vpnInterface.getFileDescriptor(),
+                    proxyAddress,
+                    "8.8.8.8",
+                    "1.1.1.1"
+            );
 
-            // 4. Запускаем обработку пакетов
+            // 4. Показываем уведомление
+            startForeground(NOTIFICATION_ID, createNotification("🛡️ VPN активен", 
+                    "Трафик через " + proxyHost + ":" + proxyPort));
+
+            // 5. Запускаем поток для поддержки
             vpnThread = new Thread(this);
             vpnThread.start();
 
+            Log.d(TAG, "VPN и tun2socks запущены");
+
         } catch (Exception e) {
             Log.e(TAG, "Ошибка запуска VPN: " + e.getMessage());
+            if (vpnInterface != null) {
+                try { vpnInterface.close(); } catch (Exception ex) {}
+                vpnInterface = null;
+            }
+            isRunning = false;
         }
     }
 
     private void stopVpn() {
         isRunning = false;
+
+        // Останавливаем tun2socks
+        if (tun2Socks != null) {
+            try {
+                tun2Socks.stopTun2Socks();
+                tun2Socks = null;
+            } catch (Exception e) {
+                Log.e(TAG, "Ошибка остановки tun2socks: " + e.getMessage());
+            }
+        }
+
+        // Закрываем интерфейс
+        if (vpnInterface != null) {
+            try {
+                vpnInterface.close();
+            } catch (Exception e) {}
+            vpnInterface = null;
+        }
+
+        // Останавливаем поток
         if (vpnThread != null) {
             vpnThread.interrupt();
             vpnThread = null;
         }
-        if (tunnel != null) {
-            try { tunnel.close(); } catch (Exception e) {}
-            tunnel = null;
-        }
-        if (vpnInterface != null) {
-            try { vpnInterface.close(); } catch (Exception e) {}
-            vpnInterface = null;
-        }
+
         stopForeground(true);
         Log.d(TAG, "VPN остановлен");
     }
 
     @Override
     public void run() {
-        try {
-            FileDescriptor fd = vpnInterface.getFileDescriptor();
-            FileInputStream in = new FileInputStream(fd);
-            FileOutputStream out = new FileOutputStream(fd);
-            byte[] buffer = new byte[1500];
-
-            while (isRunning && !Thread.interrupted()) {
-                int len = in.read(buffer);
-                if (len <= 0) continue;
-
-                // Здесь нужно перенаправлять пакеты через tun2socks
-                // Для простоты — просто пропускаем через туннель
-                // В реальном проекте используй библиотеку tun2socks
-
-                // Отправляем через защищённый сокет к прокси-серверу
-                // (Это упрощённая версия, для полной реализации нужна tun2socks)
+        // Держим поток живым, пока VPN работает
+        while (isRunning) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                break;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Ошибка в VPN потоке: " + e.getMessage());
         }
     }
 
