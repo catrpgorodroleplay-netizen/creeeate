@@ -2,9 +2,9 @@ package com.voice.app;
 
 import android.Manifest;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -34,19 +34,11 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-
-import androidx.webkit.WebViewFeature;
-import androidx.webkit.ProxyController;
-import androidx.webkit.ProxyConfig;
-
 public class MainActivity extends BridgeActivity {
 
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    private static final int REQUEST_VPN = 999;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -61,9 +53,8 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // === ПРОКСИ ===
-    private boolean isProxyEnabled = false;
-    private final Executor mainExecutor = Executors.newSingleThreadExecutor();
+    // === ПЕРСОНАЖ (ОВЕРЛЕЙ) ===
+    private OverlayCharacterManager characterManager;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -97,6 +88,10 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+
+        // === ИНИЦИАЛИЗАЦИЯ МЕНЕДЖЕРА ПЕРСОНАЖА ===
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        characterManager = new OverlayCharacterManager(windowManager);
     }
 
     private void requestPermissionsIfNeeded() {
@@ -117,94 +112,6 @@ public class MainActivity extends BridgeActivity {
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
         }
-    }
-
-    // ===== ПРОКСИ =====
-    private void setupProxy(boolean enable) {
-        if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            Toast.makeText(this, "Прокси не поддерживается", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        ProxyController proxyController = ProxyController.getInstance();
-
-        if (enable) {
-            SharedPreferences prefs = getSharedPreferences("proxy_settings", MODE_PRIVATE);
-            ProxySettingsActivity.ProxyData proxy = ProxySettingsActivity.getProxySettings(prefs);
-
-            if (proxy == null) {
-                Toast.makeText(this, "❌ Нет сохранённого прокси", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String proxyRule = proxy.server + ":" + proxy.port;
-            isProxyEnabled = true;
-
-            proxyController.clearProxyOverride(mainExecutor, () -> {
-                ProxyConfig proxyConfig = new ProxyConfig.Builder()
-                        .addProxyRule(proxyRule)
-                        .addBypassRule("localhost")
-                        .addBypassRule("127.0.0.1")
-                        .build();
-
-                proxyController.setProxyOverride(proxyConfig, mainExecutor, () -> {
-                    runOnUiThread(() -> {
-                        Toast.makeText(MainActivity.this, "🔒 Прокси включён: " + proxyRule, Toast.LENGTH_SHORT).show();
-                        if (webView != null) webView.reload();
-                    });
-                });
-            });
-        } else {
-            isProxyEnabled = false;
-            proxyController.clearProxyOverride(mainExecutor, () -> {
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "🔓 Прокси выключен", Toast.LENGTH_SHORT).show();
-                    if (webView != null) webView.reload();
-                });
-            });
-        }
-    }
-
-    private void toggleProxy() {
-        if (isProxyEnabled) {
-            setupProxy(false);
-        } else {
-            setupProxy(true);
-        }
-    }
-
-    private void applyProxyOnStart() {
-        SharedPreferences prefs = getSharedPreferences("proxy_settings", MODE_PRIVATE);
-        if (prefs.getBoolean("enabled", false)) {
-            setupProxy(true);
-        }
-    }
-
-    // ===== VPN =====
-    private void toggleVpn() {
-        if (VpnService.isRunning) {
-            stopVpn();
-        } else {
-            startVpn();
-        }
-    }
-
-    private void startVpn() {
-        Intent intent = new Intent(this, VpnService.class);
-        if (android.net.VpnService.prepare(this) != null) {
-            Intent prepareIntent = android.net.VpnService.prepare(this);
-            startActivityForResult(prepareIntent, REQUEST_VPN);
-        } else {
-            ContextCompat.startForegroundService(this, intent);
-            Toast.makeText(this, "🛡️ VPN включён", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void stopVpn() {
-        Intent intent = new Intent(this, VpnService.class);
-        intent.setAction("STOP");
-        startService(intent);
-        Toast.makeText(this, "🔓 VPN выключен", Toast.LENGTH_SHORT).show();
     }
 
     // ===== ГЛАВНЫЙ КРУЖОК =====
@@ -286,7 +193,7 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    // ===== ОВЕРЛЕЙ =====
+    // ===== ОВЕРЛЕЙ С САЙТОМ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -330,7 +237,6 @@ public class MainActivity extends BridgeActivity {
         if (webViewState != null) {
             webView.restoreState(webViewState);
         } else {
-            applyProxyOnStart();
             webView.loadUrl("https://crconferensimessenger.vercel.app/");
         }
 
@@ -365,44 +271,48 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // КНОПКА НАСТРОЕК ПРОКСИ
-        ImageButton settingsBtn = createCircleButton(createSettingsIcon(), "#2196F3");
-        FrameLayout.LayoutParams settingsP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
-        settingsP.setMargins(0, 0, 20, 120);
-        settingsBtn.setLayoutParams(settingsP);
-        settingsBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, ProxySettingsActivity.class);
-            startActivity(intent);
+        // === КНОПКА ДЛЯ ПЕРСОНАЖА ===
+        ImageButton characterBtn = createCircleButton(createCharacterIcon(), "#FF5722");
+        FrameLayout.LayoutParams charP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
+        charP.setMargins(20, 0, 0, 120);
+        characterBtn.setLayoutParams(charP);
+        characterBtn.setOnClickListener(v -> {
+            // Загружаем персонажа из ресурсов (нужна картинка)
+            Bitmap characterBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.character);
+            if (characterBitmap != null) {
+                characterManager.loadCharacter(characterBitmap);
+                Toast.makeText(this, "🦸 Персонаж загружен! Перетащи, затем нажми 'Закрепить'", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "❌ Добавь картинку character.png в res/drawable", Toast.LENGTH_SHORT).show();
+            }
         });
 
-        // КНОПКА ПРОКСИ
-        ImageButton proxyBtn = createCircleButton(createProxyIcon(), isProxyEnabled ? "#4CAF50" : "#FF9800");
-        FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
-        proxyP.setMargins(20, 0, 0, 120);
-        proxyBtn.setLayoutParams(proxyP);
-        proxyBtn.setOnClickListener(v -> {
-            toggleProxy();
-            proxyBtn.setImageDrawable(createProxyIcon());
-            proxyBtn.setBackground(createCircleButtonBackground(isProxyEnabled ? "#4CAF50" : "#FF9800"));
+        // === КНОПКА ЗАКРЕПЛЕНИЯ ПЕРСОНАЖА ===
+        ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
+        FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
+        fixP.setMargins(0, 0, 0, 40);
+        fixBtn.setLayoutParams(fixP);
+        fixBtn.setOnClickListener(v -> {
+            characterManager.fixCharacter();
+            Toast.makeText(this, "🔒 Персонаж зафиксирован! Не реагирует на нажатия", Toast.LENGTH_SHORT).show();
         });
 
-        // КНОПКА VPN
-        ImageButton vpnBtn = createCircleButton(createVpnIcon(), VpnService.isRunning ? "#4CAF50" : "#FF9800");
-        FrameLayout.LayoutParams vpnP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
-        vpnP.setMargins(0, 0, 0, 40);
-        vpnBtn.setLayoutParams(vpnP);
-        vpnBtn.setOnClickListener(v -> {
-            toggleVpn();
-            vpnBtn.setImageDrawable(createVpnIcon());
-            vpnBtn.setBackground(createCircleButtonBackground(VpnService.isRunning ? "#4CAF50" : "#FF9800"));
+        // === КНОПКА УДАЛЕНИЯ ПЕРСОНАЖА ===
+        ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
+        FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
+        removeP.setMargins(0, 0, 20, 120);
+        removeBtn.setLayoutParams(removeP);
+        removeBtn.setOnClickListener(v -> {
+            characterManager.removeCharacter();
+            Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
         });
 
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
-        mainOverlay.addView(settingsBtn);
-        mainOverlay.addView(proxyBtn);
-        mainOverlay.addView(vpnBtn);
+        mainOverlay.addView(characterBtn);
+        mainOverlay.addView(fixBtn);
+        mainOverlay.addView(removeBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -426,55 +336,28 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
-    private int getOverlayFlag() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
-                WindowManager.LayoutParams.TYPE_PHONE;
-    }
-
-    private ImageButton createCircleButton(Drawable icon, String color) {
-        ImageButton btn = new ImageButton(this);
-        btn.setImageDrawable(icon);
-        btn.setBackground(createCircleButtonBackground(color));
-        btn.setPadding(20, 20, 20, 20);
-        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        return btn;
-    }
-
-    private GradientDrawable createCircleButtonBackground(String color) {
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.OVAL);
-        d.setColor(Color.parseColor(color));
-        d.setStroke(4, Color.WHITE);
-        return d;
-    }
-
-    private Drawable createSettingsIcon() {
+    // ===== ИКОНКИ ДЛЯ КНОПОК =====
+    private Drawable createCharacterIcon() {
         Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint();
         p.setAntiAlias(true);
         p.setColor(Color.WHITE);
-        p.setStrokeWidth(4);
+        p.setStrokeWidth(6);
         p.setStyle(Paint.Style.STROKE);
 
-        float cx = 30, cy = 30;
-        c.drawCircle(cx, cy, 16, p);
-        p.setStrokeWidth(6);
-        for (int i = 0; i < 8; i++) {
-            double angle = i * Math.PI / 4;
-            float x1 = cx + (float)(22 * Math.cos(angle));
-            float y1 = cy + (float)(22 * Math.sin(angle));
-            float x2 = cx + (float)(28 * Math.cos(angle));
-            float y2 = cy + (float)(28 * Math.sin(angle));
-            c.drawLine(x1, y1, x2, y2, p);
-        }
+        // Человечек
+        c.drawCircle(30, 20, 12, p); // голова
+        c.drawLine(30, 32, 30, 48, p); // тело
+        c.drawLine(30, 36, 18, 26, p); // левая рука
+        c.drawLine(30, 36, 42, 26, p); // правая рука
+        c.drawLine(30, 48, 20, 58, p); // левая нога
+        c.drawLine(30, 48, 40, 58, p); // правая нога
 
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
-    private Drawable createProxyIcon() {
+    private Drawable createFixIcon() {
         Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint();
@@ -483,41 +366,28 @@ public class MainActivity extends BridgeActivity {
         p.setStrokeWidth(6);
         p.setStyle(Paint.Style.STROKE);
 
+        // Замок
         float cx = 30, cy = 30;
-        c.drawLine(cx - 20, cy - 5, cx - 20, cy + 15, p);
-        c.drawLine(cx - 20, cy - 5, cx, cy - 15, p);
-        c.drawLine(cx + 20, cy - 5, cx, cy - 15, p);
-        c.drawLine(cx + 20, cy - 5, cx + 20, cy + 15, p);
-        c.drawLine(cx - 20, cy + 15, cx, cy + 25, p);
-        c.drawLine(cx + 20, cy + 15, cx, cy + 25, p);
-
-        p.setStrokeWidth(4);
-        c.drawLine(cx - 8, cy + 2, cx - 2, cy + 10, p);
-        c.drawLine(cx - 2, cy + 10, cx + 10, cy - 6, p);
+        c.drawRect(cx - 10, cy + 5, cx + 10, cy + 25, p);
+        c.drawLine(cx - 6, cy + 5, cx - 6, cy - 5, p);
+        c.drawLine(cx + 6, cy + 5, cx + 6, cy - 5, p);
+        c.drawArc(cx - 10, cy - 15, cx + 10, cy - 5, 0, 180, false, p);
 
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
-    private Drawable createVpnIcon() {
+    private Drawable createRemoveIcon() {
         Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint();
         p.setAntiAlias(true);
         p.setColor(Color.WHITE);
-        p.setStrokeWidth(6);
+        p.setStrokeWidth(8);
         p.setStyle(Paint.Style.STROKE);
 
-        float cx = 30, cy = 30;
-        c.drawLine(cx - 18, cy - 5, cx - 18, cy + 12, p);
-        c.drawLine(cx - 18, cy - 5, cx, cy - 15, p);
-        c.drawLine(cx + 18, cy - 5, cx, cy - 15, p);
-        c.drawLine(cx + 18, cy - 5, cx + 18, cy + 12, p);
-        c.drawLine(cx - 18, cy + 12, cx, cy + 22, p);
-        c.drawLine(cx + 18, cy + 12, cx, cy + 22, p);
-
-        p.setStrokeWidth(4);
-        c.drawLine(cx - 8, cy + 2, cx - 2, cy + 10, p);
-        c.drawLine(cx - 2, cy + 10, cx + 10, cy - 6, p);
+        float cx = 30, cy = 30, o = 18;
+        c.drawLine(cx - o, cy - o, cx + o, cy + o, p);
+        c.drawLine(cx + o, cy - o, cx - o, cy + o, p);
 
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
@@ -549,6 +419,25 @@ public class MainActivity extends BridgeActivity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
+    private int getOverlayFlag() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
+                WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    private ImageButton createCircleButton(Drawable icon, String color) {
+        ImageButton btn = new ImageButton(this);
+        btn.setImageDrawable(icon);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(Color.parseColor(color));
+        d.setStroke(4, Color.WHITE);
+        btn.setBackground(d);
+        btn.setPadding(20, 20, 20, 20);
+        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        return btn;
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -566,30 +455,17 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_VPN) {
-            if (resultCode == RESULT_OK) {
-                Intent intent = new Intent(this, VpnService.class);
-                ContextCompat.startForegroundService(this, intent);
-                Toast.makeText(this, "🛡️ VPN включён", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "❌ VPN не разрешён", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    @Override
     public void onDestroy() {
         super.onDestroy();
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            ProxyController.getInstance().clearProxyOverride(mainExecutor, () -> {});
-        }
         if (mainCircle != null && windowManager != null) {
             windowManager.removeView(mainCircle);
         }
         if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
             windowManager.removeView(mainOverlay);
+        }
+        // Удаляем персонажа
+        if (characterManager != null) {
+            characterManager.removeCharacter();
         }
     }
 
@@ -607,4 +483,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-                           }
+    }
