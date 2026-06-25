@@ -56,19 +56,9 @@ public class ProxySettingsActivity extends AppCompatActivity {
             return;
         }
 
-        // === НОВАЯ ПРОВЕРКА ===
+        // ТОЛЬКО ПРОВЕРКА: содержит только hex-символы (0-9, a-f, A-F)
         if (!secret.matches("[0-9a-fA-F]+")) {
-            Toast.makeText(this, "Секрет должен содержать только hex-символы (0-9, a-f)", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (secret.length() != 32 && secret.length() != 34) {
-            Toast.makeText(this, "Секрет должен быть 32 или 34 hex-символа", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (secret.length() == 34 && !secret.startsWith("dd")) {
-            Toast.makeText(this, "34-символьный секрет должен начинаться с 'dd'", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Секрет должен содержать только hex-символы", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -79,7 +69,7 @@ public class ProxySettingsActivity extends AppCompatActivity {
         editor.putBoolean("enabled", true);
         editor.apply();
 
-        Toast.makeText(this, "✅ Прокси сохранён (" + secret.length() + " симв.)", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "✅ Прокси сохранён", Toast.LENGTH_SHORT).show();
         finish();
     }
 
