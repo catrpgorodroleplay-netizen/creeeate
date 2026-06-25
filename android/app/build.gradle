@@ -40,8 +40,8 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'androidx.webkit:webkit:1.7.0'
     
-    // === TUN2SOCKS ДЛЯ РАБОЧЕГО VPN ===
-    implementation 'com.github.dosgo:go-tun2socks:1.0.0'
+    // === VPN ЧЕРЕЗ SOCKS5 (работает без tun2socks) ===
+    implementation 'com.github.hexjoker:tinyvpn:1.0.6'
     
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
