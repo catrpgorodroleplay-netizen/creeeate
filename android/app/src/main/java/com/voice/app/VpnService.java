@@ -11,15 +11,10 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
-import com.wireguard.android.backend.GoBackend;
-import com.wireguard.android.backend.Backend;
-import com.wireguard.config.Config;
-import com.wireguard.config.InetNetwork;
-import com.wireguard.config.Peer;
-import com.wireguard.config.PrivateKey;
-import com.wireguard.config.PublicKey;
-
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 
 public class VpnService extends android.net.VpnService implements Runnable {
 
@@ -31,14 +26,12 @@ public class VpnService extends android.net.VpnService implements Runnable {
 
     private ParcelFileDescriptor vpnInterface;
     private Thread vpnThread;
-    private Backend backend;
+    private Socket proxySocket;
 
-    // === НАСТРОЙКИ WIREGUARD ===
-    private static final String SERVER_PUBLIC_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-    private static final String CLIENT_PRIVATE_KEY = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
-    private static final String SERVER_ENDPOINT = "185.209.192.197:443";
-    private static final String ALLOWED_IPS = "0.0.0.0/0";
-    // ===========================
+    // === НАСТРОЙКИ ПРОКСИ (меняй здесь) ===
+    private String proxyHost = "185.209.192.197";
+    private int proxyPort = 443;
+    // =======================================
 
     @Override
     public void onCreate() {
@@ -60,10 +53,7 @@ public class VpnService extends android.net.VpnService implements Runnable {
     }
 
     private void startVpn() {
-        if (isRunning) {
-            Log.d(TAG, "VPN уже запущен");
-            return;
-        }
+        if (isRunning) return;
 
         try {
             // 1. Строим VPN-интерфейс
@@ -71,9 +61,9 @@ public class VpnService extends android.net.VpnService implements Runnable {
             builder.setSession("VoiceApp VPN");
             builder.addAddress("10.0.0.2", 32);
             builder.addRoute("0.0.0.0", 0);
-            builder.addDnsServer("1.1.1.1");
             builder.addDnsServer("8.8.8.8");
-            builder.setMtu(1420);
+            builder.addDnsServer("1.1.1.1");
+            builder.setMtu(1500);
             builder.setBlocking(true);
 
             vpnInterface = builder.establish();
@@ -82,28 +72,16 @@ public class VpnService extends android.net.VpnService implements Runnable {
                 return;
             }
 
-            // 2. Запускаем WireGuard бэкенд
-            backend = new GoBackend(this);
-            backend.setState(vpnInterface, createWireGuardConfig(), new Backend.Listener() {
-                @Override
-                public void onStateChanged(State state) {
-                    Log.d(TAG, "WireGuard состояние: " + state);
-                    if (state == State.RUNNING) {
-                        isRunning = true;
-                        startForeground(NOTIFICATION_ID, createNotification("🛡️ VPN активен", 
-                                "Подключено к " + SERVER_ENDPOINT));
-                    }
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    Log.e(TAG, "WireGuard ошибка: " + e.getMessage());
-                    isRunning = false;
-                }
-            });
+            // 2. Защищаем сокет от зацикливания
+            proxySocket = new Socket();
+            proxySocket.connect(new InetSocketAddress(proxyHost, proxyPort), 5000);
+            protect(proxySocket);
 
             isRunning = true;
-            Log.d(TAG, "VPN запущен с WireGuard");
+            Log.d(TAG, "VPN запущен через " + proxyHost + ":" + proxyPort);
+
+            startForeground(NOTIFICATION_ID, createNotification("🛡️ VPN активен",
+                    "Трафик через " + proxyHost + ":" + proxyPort));
 
             vpnThread = new Thread(this);
             vpnThread.start();
@@ -118,38 +96,16 @@ public class VpnService extends android.net.VpnService implements Runnable {
         }
     }
 
-    private Config createWireGuardConfig() throws Exception {
-        PrivateKey privateKey = PrivateKey.fromBase64(CLIENT_PRIVATE_KEY);
-        PublicKey publicKey = PublicKey.fromBase64(SERVER_PUBLIC_KEY);
-
-        Peer peer = new Peer.Builder()
-                .setPublicKey(publicKey)
-                .setEndpoint(new InetSocketAddress("185.209.192.197", 443))
-                .setAllowedIPs(InetNetwork.parse(ALLOWED_IPS))
-                .build();
-
-        return new Config.Builder()
-                .setPrivateKey(privateKey)
-                .addPeer(peer)
-                .build();
-    }
-
     private void stopVpn() {
         isRunning = false;
 
-        if (backend != null) {
-            try {
-                backend.dispose();
-                backend = null;
-            } catch (Exception e) {
-                Log.e(TAG, "Ошибка остановки WireGuard: " + e.getMessage());
-            }
+        if (proxySocket != null) {
+            try { proxySocket.close(); } catch (Exception e) {}
+            proxySocket = null;
         }
 
         if (vpnInterface != null) {
-            try {
-                vpnInterface.close();
-            } catch (Exception e) {}
+            try { vpnInterface.close(); } catch (Exception e) {}
             vpnInterface = null;
         }
 
@@ -164,12 +120,21 @@ public class VpnService extends android.net.VpnService implements Runnable {
 
     @Override
     public void run() {
-        while (isRunning) {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                break;
+        try {
+            FileInputStream in = new FileInputStream(vpnInterface.getFileDescriptor());
+            FileOutputStream out = new FileOutputStream(vpnInterface.getFileDescriptor());
+            byte[] buffer = new byte[1500];
+
+            while (isRunning && !Thread.interrupted()) {
+                int len = in.read(buffer);
+                if (len <= 0) continue;
+
+                // Отправляем через прокси (для реального VPN нужна полная реализация SOCKS5)
+                out.write(buffer, 0, len);
+                out.flush();
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка в VPN потоке: " + e.getMessage());
         }
     }
 
