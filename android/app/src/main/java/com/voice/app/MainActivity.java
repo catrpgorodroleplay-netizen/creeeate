@@ -375,7 +375,7 @@ public class MainActivity extends BridgeActivity {
             startActivity(intent);
         });
 
-        // КНОПКА ВКЛ/ВЫКЛ ПРОКСИ
+        // КНОПКА ПРОКСИ
         ImageButton proxyBtn = createCircleButton(createProxyIcon(), isProxyEnabled ? "#4CAF50" : "#FF9800");
         FrameLayout.LayoutParams proxyP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
         proxyP.setMargins(20, 0, 0, 120);
@@ -607,4 +607,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-            }
+                           }
