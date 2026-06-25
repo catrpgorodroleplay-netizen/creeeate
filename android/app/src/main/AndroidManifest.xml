@@ -2,35 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.voice.app">
 
-    <!-- ОСНОВНЫЕ РАЗРЕШЕНИЯ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- МИКРОФОН -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
-    <!-- КАМЕРА -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
-    <!-- ФОНОВАЯ РАБОТА -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    
-    <!-- УВЕДОМЛЕНИЯ (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- ДОПОЛНИТЕЛЬНЫЕ -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    
-    <!-- VPN -->
-    <uses-permission android:name="android.permission.BIND_VPN_SERVICE" />
-
-    <!-- ====== ЭТО САМОЕ ВАЖНОЕ! РАЗРЕШЕНИЕ НА ОВЕРЛЕЙ ====== -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
@@ -40,10 +22,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true"
-        android:requestLegacyExternalStorage="true">
+        android:usesCleartextTraffic="true">
 
-        <!-- ГЛАВНАЯ АКТИВНОСТЬ -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -58,23 +38,6 @@
             </intent-filter>
         </activity>
 
-        <!-- НАСТРОЙКИ ПРОКСИ -->
-        <activity
-            android:name=".ProxySettingsActivity"
-            android:theme="@style/Theme.AppCompat.NoActionBar"
-            android:exported="false" />
-
-        <!-- VPN СЕРВИС -->
-        <service
-            android:name=".VpnService"
-            android:permission="android.permission.BIND_VPN_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.net.VpnService" />
-            </intent-filter>
-        </service>
-
-        <!-- СЕРВИС ДЛЯ ГОЛОСА -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
@@ -85,7 +48,6 @@
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
-        <!-- ПРОВАЙДЕР ДЛЯ ФАЙЛОВ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
