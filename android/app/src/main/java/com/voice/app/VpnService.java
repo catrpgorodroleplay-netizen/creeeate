@@ -11,7 +11,7 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
-import com.github.dosgo.tun2socks.Tun2Socks;
+import com.hexjoker.tinyvpn.TinyVpn;
 
 import java.net.InetSocketAddress;
 
@@ -25,7 +25,7 @@ public class VpnService extends android.net.VpnService implements Runnable {
 
     private ParcelFileDescriptor vpnInterface;
     private Thread vpnThread;
-    private Tun2Socks tun2Socks;
+    private TinyVpn tinyVpn;
 
     // === НАСТРОЙКИ ПРОКСИ (меняй здесь) ===
     private String proxyHost = "185.209.192.197";
@@ -62,14 +62,11 @@ public class VpnService extends android.net.VpnService implements Runnable {
             Builder builder = new Builder();
             builder.setSession("VoiceApp VPN");
             builder.addAddress("10.0.0.2", 32);
-            builder.addRoute("0.0.0.0", 0); // Весь трафик через VPN
+            builder.addRoute("0.0.0.0", 0);
             builder.addDnsServer("8.8.8.8");
             builder.addDnsServer("1.1.1.1");
             builder.setMtu(1500);
             builder.setBlocking(true);
-
-            // Разрешаем всем приложениям использовать VPN
-            // builder.addDisallowedApplication("com.android.chrome"); // можно исключить
 
             vpnInterface = builder.establish();
             if (vpnInterface == null) {
@@ -77,37 +74,19 @@ public class VpnService extends android.net.VpnService implements Runnable {
                 return;
             }
 
-            // 2. ЗАЩИЩАЕМ ТУННЕЛЬ
-            boolean protectedSocket = protect(vpnInterface.getFileDescriptor());
-            if (!protectedSocket) {
-                Log.e(TAG, "Не удалось защитить сокет");
-                vpnInterface.close();
-                vpnInterface = null;
-                return;
-            }
+            // 2. Запускаем TinyVPN
+            tinyVpn = new TinyVpn();
+            tinyVpn.start(vpnInterface.getFileDescriptor(), 
+                    InetSocketAddress.createUnresolved(proxyHost, proxyPort));
 
             isRunning = true;
-            Log.d(TAG, "VPN запущен");
+            Log.d(TAG, "VPN запущен через " + proxyHost + ":" + proxyPort);
 
-            // 3. ЗАПУСКАЕМ TUN2SOCKS
-            String proxyAddress = proxyHost + ":" + proxyPort;
-            tun2Socks = new Tun2Socks();
-            tun2Socks.startTun2Socks(
-                    vpnInterface.getFileDescriptor(),
-                    proxyAddress,
-                    "8.8.8.8",
-                    "1.1.1.1"
-            );
-
-            // 4. Показываем уведомление
             startForeground(NOTIFICATION_ID, createNotification("🛡️ VPN активен", 
                     "Трафик через " + proxyHost + ":" + proxyPort));
 
-            // 5. Запускаем поток для поддержки
             vpnThread = new Thread(this);
             vpnThread.start();
-
-            Log.d(TAG, "VPN и tun2socks запущены");
 
         } catch (Exception e) {
             Log.e(TAG, "Ошибка запуска VPN: " + e.getMessage());
@@ -122,17 +101,15 @@ public class VpnService extends android.net.VpnService implements Runnable {
     private void stopVpn() {
         isRunning = false;
 
-        // Останавливаем tun2socks
-        if (tun2Socks != null) {
+        if (tinyVpn != null) {
             try {
-                tun2Socks.stopTun2Socks();
-                tun2Socks = null;
+                tinyVpn.stop();
+                tinyVpn = null;
             } catch (Exception e) {
-                Log.e(TAG, "Ошибка остановки tun2socks: " + e.getMessage());
+                Log.e(TAG, "Ошибка остановки TinyVPN: " + e.getMessage());
             }
         }
 
-        // Закрываем интерфейс
         if (vpnInterface != null) {
             try {
                 vpnInterface.close();
@@ -140,7 +117,6 @@ public class VpnService extends android.net.VpnService implements Runnable {
             vpnInterface = null;
         }
 
-        // Останавливаем поток
         if (vpnThread != null) {
             vpnThread.interrupt();
             vpnThread = null;
@@ -152,7 +128,6 @@ public class VpnService extends android.net.VpnService implements Runnable {
 
     @Override
     public void run() {
-        // Держим поток живым, пока VPN работает
         while (isRunning) {
             try {
                 Thread.sleep(1000);
