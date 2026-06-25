@@ -91,7 +91,6 @@ public class MainActivity extends BridgeActivity {
         }
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        // ИСПРАВЛЕНО: передаём this как Context
         characterManager = new OverlayCharacterManager(this, windowManager);
     }
 
@@ -116,6 +115,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void pickCharacterImage() {
+        if (characterManager == null) {
+            Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
         startActivityForResult(Intent.createChooser(intent, "Выберите изображение персонажа"), REQUEST_PICK_IMAGE);
@@ -278,7 +281,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // КНОПКА ВЫБОРА ПЕРСОНАЖА
+        // === КНОПКА ВЫБОРА ПЕРСОНАЖА ===
         ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
         FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
         pickP.setMargins(20, 0, 0, 120);
@@ -286,25 +289,29 @@ public class MainActivity extends BridgeActivity {
         pickCharacterBtn.setOnClickListener(v -> pickCharacterImage());
         mainOverlay.addView(pickCharacterBtn);
 
-        // КНОПКА ЗАКРЕПЛЕНИЯ
+        // === КНОПКА ЗАКРЕПЛЕНИЯ ===
         ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
         FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
         fixP.setMargins(0, 0, 0, 40);
         fixBtn.setLayoutParams(fixP);
         fixBtn.setOnClickListener(v -> {
-            characterManager.fixCharacter();
-            Toast.makeText(this, "🔒 Персонаж зафиксирован", Toast.LENGTH_SHORT).show();
+            if (characterManager != null) {
+                characterManager.fixCharacter();
+                Toast.makeText(this, "🔒 Персонаж зафиксирован", Toast.LENGTH_SHORT).show();
+            }
         });
         mainOverlay.addView(fixBtn);
 
-        // КНОПКА УДАЛЕНИЯ
+        // === КНОПКА УДАЛЕНИЯ ===
         ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
         FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         removeP.setMargins(0, 0, 20, 120);
         removeBtn.setLayoutParams(removeP);
         removeBtn.setOnClickListener(v -> {
-            characterManager.removeCharacter();
-            Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
+            if (characterManager != null) {
+                characterManager.removeCharacter();
+                Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
+            }
         });
         mainOverlay.addView(removeBtn);
 
@@ -438,8 +445,12 @@ public class MainActivity extends BridgeActivity {
             Uri imageUri = data.getData();
             try {
                 Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
-                characterManager.loadCharacter(bitmap);
-                Toast.makeText(this, "🦸 Персонаж загружен! Перетащи, затем нажми 'Закрепить'", Toast.LENGTH_LONG).show();
+                if (characterManager != null) {
+                    characterManager.loadCharacter(bitmap);
+                    Toast.makeText(this, "🦸 Персонаж загружен!", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
+                }
             } catch (Exception e) {
                 Toast.makeText(this, "❌ Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
@@ -490,4 +501,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-}
+                                                    }
