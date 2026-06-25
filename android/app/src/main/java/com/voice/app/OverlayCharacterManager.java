@@ -1,5 +1,6 @@
 package com.voice.app;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -11,6 +12,7 @@ import android.widget.ImageView;
 
 public class OverlayCharacterManager {
 
+    private Context context;
     private WindowManager windowManager;
     private ImageView characterView;
     private WindowManager.LayoutParams params;
@@ -18,7 +20,8 @@ public class OverlayCharacterManager {
     private float startX, startY;
     private int initialX, initialY;
 
-    public OverlayCharacterManager(WindowManager wm) {
+    public OverlayCharacterManager(Context context, WindowManager wm) {
+        this.context = context;
         this.windowManager = wm;
     }
 
@@ -32,7 +35,7 @@ public class OverlayCharacterManager {
             windowManager.removeView(characterView);
         }
 
-        characterView = new ImageView(windowManager.getContext());
+        characterView = new ImageView(context);
         characterView.setImageBitmap(bitmap);
         characterView.setScaleType(ImageView.ScaleType.FIT_XY);
 
