@@ -30,6 +30,9 @@
     <!-- VPN -->
     <uses-permission android:name="android.permission.BIND_VPN_SERVICE" />
 
+    <!-- ====== ЭТО САМОЕ ВАЖНОЕ! РАЗРЕШЕНИЕ НА ОВЕРЛЕЙ ====== -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
