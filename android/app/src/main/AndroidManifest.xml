@@ -27,8 +27,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
-    <!-- ПЛАВАЮЩИЕ ОКНА -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- VPN -->
+    <uses-permission android:name="android.permission.BIND_VPN_SERVICE" />
 
     <application
         android:allowBackup="true"
@@ -61,11 +61,15 @@
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
 
-        <!-- СЕРВИС ПРОКСИ (LittleProxy) -->
+        <!-- VPN СЕРВИС -->
         <service
-            android:name=".LittleProxyService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+            android:name=".VpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
 
         <!-- СЕРВИС ДЛЯ ГОЛОСА -->
         <service
