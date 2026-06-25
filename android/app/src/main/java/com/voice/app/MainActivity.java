@@ -53,7 +53,6 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // === ПЕРСОНАЖ ===
     private OverlayCharacterManager characterManager;
 
     @Override
@@ -114,6 +113,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void pickCharacterImage() {
+        if (characterManager == null) {
+            Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
         startActivityForResult(Intent.createChooser(intent, "Выберите изображение персонажа"), REQUEST_PICK_IMAGE);
@@ -249,6 +252,8 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
+        // ===== СНАЧАЛА ДОБАВЛЯЕМ ВСЕ КНОПКИ =====
+
         // Кнопка ЗАКРЫТЬ
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
@@ -260,6 +265,7 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
+        mainOverlay.addView(closeBtn);
 
         // Кнопка СВЕРНУТЬ
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
@@ -275,24 +281,19 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
+        mainOverlay.addView(minimizeBtn);
 
         // ===== КНОПКИ ПЕРСОНАЖА =====
 
-        // 1. КНОПКА ВЫБОРА ПЕРСОНАЖА (оранжевая)
+        // 1. ВЫБРАТЬ ПЕРСОНАЖА (оранжевая)
         ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
         FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         pickP.setMargins(0, 0, 100, 40);
         pickCharacterBtn.setLayoutParams(pickP);
-        pickCharacterBtn.setOnClickListener(v -> {
-            if (characterManager != null) {
-                pickCharacterImage();
-            } else {
-                Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
-            }
-        });
+        pickCharacterBtn.setOnClickListener(v -> pickCharacterImage());
         mainOverlay.addView(pickCharacterBtn);
 
-        // 2. КНОПКА ЗАКРЕПЛЕНИЯ (зелёная)
+        // 2. ЗАКРЕПИТЬ (зелёная)
         ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
         FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         fixP.setMargins(0, 0, 20, 40);
@@ -306,7 +307,7 @@ public class MainActivity extends BridgeActivity {
         });
         mainOverlay.addView(fixBtn);
 
-        // 3. КНОПКА УДАЛЕНИЯ (красная)
+        // 3. УДАЛИТЬ (красная)
         ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
         FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
         removeP.setMargins(20, 0, 0, 40);
@@ -314,15 +315,12 @@ public class MainActivity extends BridgeActivity {
         removeBtn.setOnClickListener(v -> {
             if (characterManager != null) {
                 characterManager.removeCharacter();
-            } else {
-                Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
             }
         });
         mainOverlay.addView(removeBtn);
 
+        // ПОСЛЕ ВСЕХ КНОПОК ДОБАВЛЯЕМ WEBVIEW
         mainOverlay.addView(webView);
-        mainOverlay.addView(closeBtn);
-        mainOverlay.addView(minimizeBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -495,4 +493,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-            }
+    }
