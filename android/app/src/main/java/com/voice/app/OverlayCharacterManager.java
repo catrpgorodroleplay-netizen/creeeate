@@ -3,9 +3,7 @@ package com.voice.app;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.view.Gravity;
@@ -32,7 +30,6 @@ public class OverlayCharacterManager {
         this.windowManager = wm;
     }
 
-    // Загружаем персонажа из URI (выбранного из галереи)
     public void loadCharacterFromUri(Uri imageUri) {
         if (windowManager == null || context == null) return;
         try {
@@ -50,7 +47,6 @@ public class OverlayCharacterManager {
     private void showCharacter(Bitmap bitmap) {
         if (windowManager == null) return;
 
-        // Удаляем предыдущего персонажа
         if (characterView != null) {
             try { windowManager.removeView(characterView); } catch (Exception ignored) {}
             characterView = null;
@@ -59,7 +55,6 @@ public class OverlayCharacterManager {
         characterView = new ImageView(context);
         characterView.setImageBitmap(bitmap);
         characterView.setScaleType(ImageView.ScaleType.FIT_XY);
-        characterView.setBackgroundColor(Color.TRANSPARENT);
 
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
@@ -67,7 +62,7 @@ public class OverlayCharacterManager {
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
 
         params = new WindowManager.LayoutParams(
-                300, 300,
+                250, 250,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 flags,
                 PixelFormat.TRANSLUCENT
@@ -88,7 +83,9 @@ public class OverlayCharacterManager {
                 case MotionEvent.ACTION_MOVE:
                     params.x = initialX + (int) (event.getRawX() - startX);
                     params.y = initialY + (int) (event.getRawY() - startY);
-                    windowManager.updateViewLayout(characterView, params);
+                    try {
+                        windowManager.updateViewLayout(characterView, params);
+                    } catch (Exception ignored) {}
                     return true;
                 default:
                     return false;
