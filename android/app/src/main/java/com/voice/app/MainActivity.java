@@ -53,6 +53,7 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
+    // === ПЕРСОНАЖ ===
     private OverlayCharacterManager characterManager;
 
     @Override
@@ -115,7 +116,7 @@ public class MainActivity extends BridgeActivity {
     private void pickCharacterImage() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
-        startActivityForResult(Intent.createChooser(intent, "Выберите изображение"), REQUEST_PICK_IMAGE);
+        startActivityForResult(Intent.createChooser(intent, "Выберите изображение персонажа"), REQUEST_PICK_IMAGE);
     }
 
     // ===== ГЛАВНЫЙ КРУЖОК =====
@@ -275,20 +276,23 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // ===== НОВЫЕ КНОПКИ ПЕРСОНАЖА =====
-        // 1. Выбрать персонажа
-        ImageButton pickBtn = createCircleButton(createCharacterIcon(), "#FF9800");
+        // ===== КНОПКИ ПЕРСОНАЖА =====
+
+        // 1. КНОПКА ВЫБОРА ПЕРСОНАЖА (оранжевая)
+        ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
         FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         pickP.setMargins(0, 0, 100, 40);
-        pickBtn.setLayoutParams(pickP);
-        pickBtn.setOnClickListener(v -> {
+        pickCharacterBtn.setLayoutParams(pickP);
+        pickCharacterBtn.setOnClickListener(v -> {
             if (characterManager != null) {
                 pickCharacterImage();
+            } else {
+                Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
             }
         });
-        mainOverlay.addView(pickBtn);
+        mainOverlay.addView(pickCharacterBtn);
 
-        // 2. Закрепить
+        // 2. КНОПКА ЗАКРЕПЛЕНИЯ (зелёная)
         ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
         FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         fixP.setMargins(0, 0, 20, 40);
@@ -302,7 +306,7 @@ public class MainActivity extends BridgeActivity {
         });
         mainOverlay.addView(fixBtn);
 
-        // 3. Удалить
+        // 3. КНОПКА УДАЛЕНИЯ (красная)
         ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
         FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
         removeP.setMargins(20, 0, 0, 40);
@@ -310,6 +314,8 @@ public class MainActivity extends BridgeActivity {
         removeBtn.setOnClickListener(v -> {
             if (characterManager != null) {
                 characterManager.removeCharacter();
+            } else {
+                Toast.makeText(this, "Ошибка: менеджер персонажа не инициализирован", Toast.LENGTH_SHORT).show();
             }
         });
         mainOverlay.addView(removeBtn);
@@ -489,4 +495,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-    }
+            }
