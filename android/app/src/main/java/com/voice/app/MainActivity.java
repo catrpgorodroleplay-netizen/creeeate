@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -24,9 +25,13 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -35,34 +40,46 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
-import java.io.InputStream;
+import java.io.IOException;
 
 public class MainActivity extends BridgeActivity {
 
+    // Константы для разрешений
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
-    private static final int REQUEST_PICK_IMAGE = 999;
+    private static final int REQUEST_GALLERY = 103;
+    private static final int REQUEST_STORAGE = 104;
 
+    // Основные компоненты
     private WindowManager windowManager;
     public static ImageButton mainCircle;
     private WindowManager.LayoutParams mainCircleParams;
+    
+    // Переменные для тач-событий главного кружка
+    private float startX, startY;
+    private int initialX, initialY;
+    private boolean isDragging = false;
+    
+    // WebView оверлей
     private FrameLayout mainOverlay;
     private WebView webView;
     private WindowManager.LayoutParams mainOverlayParams;
     private boolean isMainOverlayVisible = false;
     private Bundle webViewState = null;
 
-    private float startX, startY;
-    private int initialX, initialY;
-    private boolean isDragging = false;
-
-    // --- ПЕРСОНАЖ (всё внутри) ---
+    // Компоненты для персонажа
+    private FrameLayout characterContainer;
     private ImageView characterView;
-    private WindowManager.LayoutParams charParams;
+    private WindowManager.LayoutParams characterParams;
+    private Bitmap currentCharacterBitmap;
     private boolean isCharacterFixed = false;
-    private float charStartX, charStartY;
-    private int charInitialX, charInitialY;
+    private boolean isCharacterModeActive = false;
+    
+    // Для тач-событий персонажа
+    private float lastTouchX, lastTouchY;
+    private float initialPinchDistance = 0;
+    private float currentScale = 1.0f;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -96,8 +113,6 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
-
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     }
 
     private void requestPermissionsIfNeeded() {
@@ -117,100 +132,22 @@ public class MainActivity extends BridgeActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
-        }
-    }
-
-    // --- МЕТОДЫ ДЛЯ ПЕРСОНАЖА ---
-    private void pickCharacterImage() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*");
-        startActivityForResult(Intent.createChooser(intent, "Выберите изображение"), REQUEST_PICK_IMAGE);
-    }
-
-    private void loadCharacterFromUri(Uri imageUri) {
-        if (windowManager == null) return;
-        try {
-            InputStream inputStream = getContentResolver().openInputStream(imageUri);
-            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-            if (bitmap != null) {
-                showCharacter(bitmap);
-                Toast.makeText(this, "🦸 Персонаж загружен", Toast.LENGTH_SHORT).show();
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_STORAGE);
             }
-        } catch (Exception e) {
-            Toast.makeText(this, "Ошибка загрузки: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showCharacter(Bitmap bitmap) {
-        if (windowManager == null) return;
-
-        if (characterView != null) {
-            try { windowManager.removeView(characterView); } catch (Exception ignored) {}
-            characterView = null;
-        }
-
-        characterView = new ImageView(this);
-        characterView.setImageBitmap(bitmap);
-        characterView.setScaleType(ImageView.ScaleType.FIT_XY);
-
-        int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-
-        charParams = new WindowManager.LayoutParams(
-                250, 250,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                flags,
-                PixelFormat.TRANSLUCENT
-        );
-        charParams.gravity = Gravity.TOP | Gravity.START;
-        charParams.x = 300;
-        charParams.y = 300;
-
-        characterView.setOnTouchListener((v, event) -> {
-            if (isCharacterFixed) return false;
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    charStartX = event.getRawX();
-                    charStartY = event.getRawY();
-                    charInitialX = charParams.x;
-                    charInitialY = charParams.y;
-                    return true;
-                case MotionEvent.ACTION_MOVE:
-                    charParams.x = charInitialX + (int) (event.getRawX() - charStartX);
-                    charParams.y = charInitialY + (int) (event.getRawY() - charStartY);
-                    try {
-                        windowManager.updateViewLayout(characterView, charParams);
-                    } catch (Exception ignored) {}
-                    return true;
-                default:
-                    return false;
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_STORAGE);
             }
-        });
-
-        windowManager.addView(characterView, charParams);
-    }
-
-    private void fixCharacter() {
-        isCharacterFixed = true;
-        Toast.makeText(this, "🔒 Персонаж зафиксирован", Toast.LENGTH_SHORT).show();
-    }
-
-    private void removeCharacter() {
-        if (characterView != null && windowManager != null) {
-            try { windowManager.removeView(characterView); } catch (Exception ignored) {}
-            characterView = null;
-            isCharacterFixed = false;
-            Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private boolean isCharacterLoaded() {
-        return characterView != null;
-    }
+    // ==================== МЕТОДЫ ДЛЯ ГЛАВНОГО КРУЖКА ====================
 
-    // --- ГЛАВНЫЙ КРУЖОК ---
     private void createMainCircle() {
         int flag = getOverlayFlag();
         mainCircle = new ImageButton(this);
@@ -251,7 +188,7 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!isDragging) {
-                        toggleMainOverlay();
+                        showCharacterMenu();
                     }
                     return true;
             }
@@ -289,16 +226,432 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    // --- ОВЕРЛЕЙ ---
-    private void toggleMainOverlay() {
-        if (isMainOverlayVisible) {
-            hideMainOverlay();
-            if (mainCircle != null) mainCircle.setVisibility(View.VISIBLE);
-        } else {
-            mainCircle.setVisibility(View.GONE);
+    // ==================== МЕНЮ ПЕРСОНАЖА ====================
+
+    private void showCharacterMenu() {
+        FrameLayout menuContainer = new FrameLayout(this);
+        menuContainer.setBackgroundColor(Color.parseColor("#CC000000"));
+        
+        // Создаем меню с кнопками
+        LinearLayout menuLayout = new LinearLayout(this);
+        menuLayout.setOrientation(LinearLayout.VERTICAL);
+        menuLayout.setGravity(Gravity.CENTER);
+        menuLayout.setPadding(50, 50, 50, 50);
+        
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(30);
+        bg.setColor(Color.parseColor("#DD1E1E1E"));
+        bg.setStroke(4, Color.WHITE);
+        menuLayout.setBackground(bg);
+        
+        // Кнопка загрузки персонажа
+        Button loadBtn = new Button(this);
+        loadBtn.setText("📁 Загрузить персонажа");
+        loadBtn.setTextColor(Color.WHITE);
+        loadBtn.setBackgroundColor(Color.parseColor("#2196F3"));
+        loadBtn.setPadding(30, 20, 30, 20);
+        loadBtn.setOnClickListener(v -> {
+            removeCharacterMenu(menuContainer);
+            openGallery();
+        });
+        
+        // Кнопка использования примера
+        Button exampleBtn = new Button(this);
+        exampleBtn.setText("🎨 Использовать пример");
+        exampleBtn.setTextColor(Color.WHITE);
+        exampleBtn.setBackgroundColor(Color.parseColor("#4CAF50"));
+        exampleBtn.setPadding(30, 20, 30, 20);
+        exampleBtn.setOnClickListener(v -> {
+            removeCharacterMenu(menuContainer);
+            loadExampleCharacter();
+        });
+        
+        // Кнопка WebView
+        Button webBtn = new Button(this);
+        webBtn.setText("🌐 Открыть WebView");
+        webBtn.setTextColor(Color.WHITE);
+        webBtn.setBackgroundColor(Color.parseColor("#FF9800"));
+        webBtn.setPadding(30, 20, 30, 20);
+        webBtn.setOnClickListener(v -> {
+            removeCharacterMenu(menuContainer);
             showMainOverlay();
+        });
+        
+        // Кнопка закрыть
+        Button closeBtn = new Button(this);
+        closeBtn.setText("❌ Закрыть");
+        closeBtn.setTextColor(Color.WHITE);
+        closeBtn.setBackgroundColor(Color.parseColor("#F44336"));
+        closeBtn.setPadding(30, 20, 30, 20);
+        closeBtn.setOnClickListener(v -> removeCharacterMenu(menuContainer));
+        
+        int margin = 20;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, margin, 0, margin);
+        
+        menuLayout.addView(loadBtn, params);
+        menuLayout.addView(exampleBtn, params);
+        menuLayout.addView(webBtn, params);
+        menuLayout.addView(closeBtn, params);
+        
+        FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
+                400,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+        );
+        menuContainer.addView(menuLayout, containerParams);
+        
+        WindowManager.LayoutParams menuWindowParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                getOverlayFlag(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                PixelFormat.TRANSLUCENT
+        );
+        
+        if (windowManager != null) {
+            windowManager.addView(menuContainer, menuWindowParams);
         }
     }
+
+    private void removeCharacterMenu(FrameLayout menu) {
+        if (menu != null && windowManager != null) {
+            try {
+                windowManager.removeView(menu);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (mainCircle != null) {
+            mainCircle.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // ==================== ЗАГРУЗКА ПЕРСОНАЖА ====================
+
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(intent, REQUEST_GALLERY);
+    }
+
+    private void loadExampleCharacter() {
+        // Создаем тестового персонажа с зеленым фоном
+        Bitmap testCharacter = createTestCharacter();
+        showCharacterOnScreen(testCharacter);
+    }
+
+    private Bitmap createTestCharacter() {
+        int size = 400;
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        
+        // Зеленый фон
+        paint.setColor(Color.parseColor("#00FF00"));
+        canvas.drawRect(0, 0, size, size, paint);
+        
+        // Тело (красный кружок)
+        paint.setColor(Color.RED);
+        canvas.drawCircle(size/2, size/3, 80, paint);
+        
+        // Глаза
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(size/2 - 35, size/3 - 20, 25, paint);
+        canvas.drawCircle(size/2 + 35, size/3 - 20, 25, paint);
+        paint.setColor(Color.BLACK);
+        canvas.drawCircle(size/2 - 35, size/3 - 15, 12, paint);
+        canvas.drawCircle(size/2 + 35, size/3 - 15, 12, paint);
+        
+        // Улыбка
+        paint.setColor(Color.BLACK);
+        paint.setStrokeWidth(5);
+        paint.setStyle(Paint.Style.STROKE);
+        canvas.drawArc(size/2 - 50, size/3, size/2 + 50, size/3 + 60, 0, 180, false, paint);
+        
+        // Ноги
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.BLUE);
+        canvas.drawRect(size/2 - 50, size/3 + 90, size/2 - 20, size/3 + 160, paint);
+        canvas.drawRect(size/2 + 20, size/3 + 90, size/2 + 50, size/3 + 160, paint);
+        
+        return bitmap;
+    }
+
+    private void showCharacterOnScreen(Bitmap bitmap) {
+        if (windowManager == null) return;
+        
+        // Удаляем старого персонажа если есть
+        if (characterContainer != null && windowManager != null) {
+            try {
+                windowManager.removeView(characterContainer);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        
+        // Удаляем зеленый фон
+        currentCharacterBitmap = removeGreenScreen(bitmap, 40);
+        
+        // Создаем контейнер
+        characterContainer = new FrameLayout(this);
+        characterContainer.setBackgroundColor(Color.TRANSPARENT);
+        
+        // Создаем ImageView для персонажа
+        characterView = new ImageView(this);
+        characterView.setImageBitmap(currentCharacterBitmap);
+        characterView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        
+        // Добавляем персонажа в контейнер
+        FrameLayout.LayoutParams charParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        characterContainer.addView(characterView, charParams);
+        
+        // Добавляем контролы
+        addCharacterControls(characterContainer);
+        
+        // Настройка параметров окна
+        characterParams = new WindowManager.LayoutParams(
+                500, // ширина
+                500, // высота
+                getOverlayFlag(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                PixelFormat.TRANSLUCENT
+        );
+        characterParams.gravity = Gravity.CENTER;
+        characterParams.x = 0;
+        characterParams.y = 0;
+        
+        // Добавляем на экран
+        windowManager.addView(characterContainer, characterParams);
+        isCharacterModeActive = true;
+        isCharacterFixed = false;
+        
+        // Скрываем главный кружок
+        if (mainCircle != null) {
+            mainCircle.setVisibility(View.GONE);
+        }
+        
+        Toast.makeText(this, "✅ Персонаж загружен!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void addCharacterControls(FrameLayout container) {
+        // Кнопка фиксации
+        ImageButton fixButton = new ImageButton(this);
+        fixButton.setImageResource(android.R.drawable.ic_lock_lock);
+        GradientDrawable fixBg = new GradientDrawable();
+        fixBg.setShape(GradientDrawable.OVAL);
+        fixBg.setColor(Color.parseColor("#FF6B00"));
+        fixButton.setBackground(fixBg);
+        fixButton.setPadding(20, 20, 20, 20);
+        
+        FrameLayout.LayoutParams fixParams = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
+        fixParams.setMargins(0, 30, 30, 0);
+        fixButton.setLayoutParams(fixParams);
+        
+        fixButton.setOnClickListener(v -> {
+            isCharacterFixed = !isCharacterFixed;
+            if (isCharacterFixed) {
+                Toast.makeText(this, "🔒 Персонаж зафиксирован!", Toast.LENGTH_SHORT).show();
+                fixButton.setImageResource(android.R.drawable.ic_lock_lock);
+                // Делаем персонажа "невидимым" для тачей
+                characterView.setClickable(false);
+                characterView.setFocusable(false);
+            } else {
+                Toast.makeText(this, "🔓 Персонаж разблокирован", Toast.LENGTH_SHORT).show();
+                fixButton.setImageResource(android.R.drawable.ic_lock_idle);
+                characterView.setClickable(true);
+                characterView.setFocusable(true);
+            }
+        });
+        
+        // Кнопка удаления
+        ImageButton deleteButton = new ImageButton(this);
+        deleteButton.setImageResource(android.R.drawable.ic_delete);
+        GradientDrawable deleteBg = new GradientDrawable();
+        deleteBg.setShape(GradientDrawable.OVAL);
+        deleteBg.setColor(Color.RED);
+        deleteButton.setBackground(deleteBg);
+        deleteButton.setPadding(20, 20, 20, 20);
+        
+        FrameLayout.LayoutParams deleteParams = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
+        deleteParams.setMargins(30, 30, 0, 0);
+        deleteButton.setLayoutParams(deleteParams);
+        
+        deleteButton.setOnClickListener(v -> {
+            removeCharacter();
+        });
+        
+        // Кнопка назад (закрыть персонажа)
+        ImageButton backButton = new ImageButton(this);
+        backButton.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        GradientDrawable backBg = new GradientDrawable();
+        backBg.setShape(GradientDrawable.OVAL);
+        backBg.setColor(Color.parseColor("#9C27B0"));
+        backButton.setBackground(backBg);
+        backButton.setPadding(20, 20, 20, 20);
+        
+        FrameLayout.LayoutParams backParams = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
+        backParams.setMargins(0, 0, 0, 30);
+        backButton.setLayoutParams(backParams);
+        
+        backButton.setOnClickListener(v -> {
+            removeCharacter();
+            if (mainCircle != null) {
+                mainCircle.setVisibility(View.VISIBLE);
+            }
+        });
+        
+        // Слайдер для изменения размера
+        LinearLayout controlsLayout = new LinearLayout(this);
+        controlsLayout.setOrientation(LinearLayout.HORIZONTAL);
+        controlsLayout.setGravity(Gravity.CENTER);
+        controlsLayout.setBackgroundColor(Color.parseColor("#AA000000"));
+        controlsLayout.setPadding(20, 10, 20, 10);
+        
+        SeekBar sizeSeekBar = new SeekBar(this);
+        sizeSeekBar.setMax(300);
+        sizeSeekBar.setProgress(200);
+        sizeSeekBar.setMinWidth(150);
+        
+        TextView sizeText = new TextView(this);
+        sizeText.setText("Размер");
+        sizeText.setTextColor(Color.WHITE);
+        sizeText.setPadding(0, 0, 10, 0);
+        
+        controlsLayout.addView(sizeText);
+        controlsLayout.addView(sizeSeekBar);
+        
+        FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
+        );
+        controlsParams.setMargins(0, 0, 0, 120);
+        controlsLayout.setLayoutParams(controlsParams);
+        
+        sizeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser && characterParams != null) {
+                    int size = 200 + progress;
+                    characterParams.width = size;
+                    characterParams.height = size;
+                    if (windowManager != null && characterContainer != null) {
+                        windowManager.updateViewLayout(characterContainer, characterParams);
+                    }
+                }
+            }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        
+        container.addView(fixButton);
+        container.addView(deleteButton);
+        container.addView(backButton);
+        container.addView(controlsLayout);
+        
+        // Настройка тач-событий для перемещения
+        characterView.setOnTouchListener((v, event) -> {
+            if (isCharacterFixed) return true;
+            
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    lastTouchX = event.getRawX();
+                    lastTouchY = event.getRawY();
+                    initialX = characterParams.x;
+                    initialY = characterParams.y;
+                    return true;
+                    
+                case MotionEvent.ACTION_MOVE:
+                    if (event.getPointerCount() == 2) {
+                        // Масштабирование
+                        float distance = getDistance(event);
+                        if (initialPinchDistance == 0) {
+                            initialPinchDistance = distance;
+                        } else {
+                            float scale = distance / initialPinchDistance;
+                            int newSize = (int)(characterParams.width * scale);
+                            if (newSize > 100 && newSize < 800) {
+                                characterParams.width = newSize;
+                                characterParams.height = newSize;
+                                windowManager.updateViewLayout(characterContainer, characterParams);
+                            }
+                        }
+                    } else {
+                        // Перемещение
+                        float dx = event.getRawX() - lastTouchX;
+                        float dy = event.getRawY() - lastTouchY;
+                        characterParams.x += (int) dx;
+                        characterParams.y += (int) dy;
+                        lastTouchX = event.getRawX();
+                        lastTouchY = event.getRawY();
+                        windowManager.updateViewLayout(characterContainer, characterParams);
+                    }
+                    return true;
+                    
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP:
+                    initialPinchDistance = 0;
+                    return true;
+            }
+            return false;
+        });
+    }
+
+    private void removeCharacter() {
+        if (characterContainer != null && windowManager != null) {
+            try {
+                windowManager.removeView(characterContainer);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            characterContainer = null;
+            characterView = null;
+            currentCharacterBitmap = null;
+            isCharacterModeActive = false;
+            isCharacterFixed = false;
+        }
+    }
+
+    // ==================== CHROMAKEY (УДАЛЕНИЕ ЗЕЛЕНОГО ФОНА) ====================
+
+    private Bitmap removeGreenScreen(Bitmap source, int tolerance) {
+        Bitmap result = Bitmap.createBitmap(source.getWidth(), source.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                int pixel = source.getPixel(x, y);
+                int r = Color.red(pixel);
+                int g = Color.green(pixel);
+                int b = Color.blue(pixel);
+                
+                // Проверяем зеленый фон с tolerance
+                if (g > r + tolerance && g > b + tolerance) {
+                    // Делаем прозрачным
+                    canvas.drawPoint(x, y, Color.TRANSPARENT);
+                } else {
+                    canvas.drawPoint(x, y, pixel);
+                }
+            }
+        }
+        return result;
+    }
+
+    // ==================== WEBVIEW ОВЕРЛЕЙ ====================
 
     private void showMainOverlay() {
         if (isMainOverlayVisible) return;
@@ -340,7 +693,6 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // --- КНОПКА ЗАКРЫТЬ ---
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -351,9 +703,7 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
-        mainOverlay.addView(closeBtn);
 
-        // --- КНОПКА СВЕРНУТЬ ---
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
         FrameLayout.LayoutParams minP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
         minP.setMargins(0, 40, 20, 0);
@@ -367,40 +717,10 @@ public class MainActivity extends BridgeActivity {
                 mainCircle.setVisibility(View.VISIBLE);
             }
         });
-        mainOverlay.addView(minimizeBtn);
 
-        // --- КНОПКА ВЫБОРА ПЕРСОНАЖА (оранжевая) ---
-        ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
-        FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
-        pickP.setMargins(0, 0, 100, 40);
-        pickCharacterBtn.setLayoutParams(pickP);
-        pickCharacterBtn.setOnClickListener(v -> pickCharacterImage());
-        mainOverlay.addView(pickCharacterBtn);
-
-        // --- КНОПКА ЗАКРЕПЛЕНИЯ (зелёная) ---
-        ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
-        FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
-        fixP.setMargins(0, 0, 20, 40);
-        fixBtn.setLayoutParams(fixP);
-        fixBtn.setOnClickListener(v -> {
-            if (isCharacterLoaded()) {
-                fixCharacter();
-            } else {
-                Toast.makeText(this, "Сначала загрузи персонажа", Toast.LENGTH_SHORT).show();
-            }
-        });
-        mainOverlay.addView(fixBtn);
-
-        // --- КНОПКА УДАЛЕНИЯ (красная) ---
-        ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
-        FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
-        removeP.setMargins(20, 0, 0, 40);
-        removeBtn.setLayoutParams(removeP);
-        removeBtn.setOnClickListener(v -> removeCharacter());
-        mainOverlay.addView(removeBtn);
-
-        // --- WebView (сайт) ---
         mainOverlay.addView(webView);
+        mainOverlay.addView(closeBtn);
+        mainOverlay.addView(minimizeBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -414,6 +734,10 @@ public class MainActivity extends BridgeActivity {
             windowManager.addView(mainOverlay, mainOverlayParams);
             isMainOverlayVisible = true;
         }
+        
+        if (mainCircle != null) {
+            mainCircle.setVisibility(View.GONE);
+        }
     }
 
     private void hideMainOverlay() {
@@ -424,52 +748,25 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // --- ИКОНКИ ---
-    private Drawable createCharacterIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.WHITE);
-        p.setStrokeWidth(6);
-        p.setStyle(Paint.Style.STROKE);
-        c.drawCircle(30, 20, 12, p);
-        c.drawLine(30, 32, 30, 48, p);
-        c.drawLine(30, 36, 18, 26, p);
-        c.drawLine(30, 36, 42, 26, p);
-        c.drawLine(30, 48, 20, 58, p);
-        c.drawLine(30, 48, 40, 58, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
+    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+
+    private int getOverlayFlag() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
+                WindowManager.LayoutParams.TYPE_PHONE;
     }
 
-    private Drawable createFixIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.WHITE);
-        p.setStrokeWidth(6);
-        p.setStyle(Paint.Style.STROKE);
-        float cx = 30, cy = 30;
-        c.drawRect(cx - 10, cy + 5, cx + 10, cy + 25, p);
-        c.drawLine(cx - 6, cy + 5, cx - 6, cy - 5, p);
-        c.drawLine(cx + 6, cy + 5, cx + 6, cy - 5, p);
-        c.drawArc(cx - 10, cy - 15, cx + 10, cy - 5, 0, 180, false, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
-    }
-
-    private Drawable createRemoveIcon() {
-        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint();
-        p.setAntiAlias(true);
-        p.setColor(Color.WHITE);
-        p.setStrokeWidth(8);
-        p.setStyle(Paint.Style.STROKE);
-        float cx = 30, cy = 30, o = 18;
-        c.drawLine(cx - o, cy - o, cx + o, cy + o, p);
-        c.drawLine(cx + o, cy - o, cx - o, cy + o, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
+    private ImageButton createCircleButton(Drawable icon, String color) {
+        ImageButton btn = new ImageButton(this);
+        btn.setImageDrawable(icon);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(Color.parseColor(color));
+        d.setStroke(4, Color.WHITE);
+        btn.setBackground(d);
+        btn.setPadding(20, 20, 20, 20);
+        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        return btn;
     }
 
     private Drawable createCloseIcon() {
@@ -499,49 +796,27 @@ public class MainActivity extends BridgeActivity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
-    private int getOverlayFlag() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
-                WindowManager.LayoutParams.TYPE_PHONE;
+    private float getDistance(MotionEvent event) {
+        float x = event.getX(0) - event.getX(1);
+        float y = event.getY(0) - event.getY(1);
+        return (float) Math.sqrt(x * x + y * y);
     }
 
-    private ImageButton createCircleButton(Drawable icon, String color) {
-        ImageButton btn = new ImageButton(this);
-        btn.setImageDrawable(icon);
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.OVAL);
-        d.setColor(Color.parseColor(color));
-        d.setStroke(4, Color.WHITE);
-        btn.setBackground(d);
-        btn.setPadding(20, 20, 20, 20);
-        btn.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-        return btn;
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
-            Uri imageUri = data.getData();
-            if (imageUri != null) {
-                loadCharacterFromUri(imageUri);
-            }
-        }
-    }
+    // ==================== ЖИЗНЕННЫЙ ЦИКЛ ====================
 
     @Override
     public void onResume() {
         super.onResume();
-        if (mainCircle != null && !isMainOverlayVisible) {
-            mainCircle.setVisibility(View.GONE);
+        if (mainCircle != null && !isMainOverlayVisible && !isCharacterModeActive) {
+            mainCircle.setVisibility(View.VISIBLE);
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (mainCircle != null && !isMainOverlayVisible) {
-            mainCircle.setVisibility(View.VISIBLE);
+        if (mainCircle != null && !isMainOverlayVisible && !isCharacterModeActive) {
+            mainCircle.setVisibility(View.GONE);
         }
     }
 
@@ -549,12 +824,26 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         super.onDestroy();
         if (mainCircle != null && windowManager != null) {
-            windowManager.removeView(mainCircle);
+            try {
+                windowManager.removeView(mainCircle);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
-            windowManager.removeView(mainOverlay);
+            try {
+                windowManager.removeView(mainOverlay);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-        removeCharacter();
+        if (characterContainer != null && windowManager != null) {
+            try {
+                windowManager.removeView(characterContainer);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
@@ -570,5 +859,34 @@ public class MainActivity extends BridgeActivity {
                 Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
             }
         }
-    }
+        if (code == REQUEST_STORAGE && results.length > 0) {
+            if (results[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "📁 Доступ к хранилищу разрешен", Toast.LENGTH_SHORT).show();
             }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_GALLERY && resultCode == RESULT_OK && data != null) {
+            Uri imageUri = data.getData();
+            try {
+                Bitmap original = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+                showCharacterOnScreen(original);
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "❌ Ошибка загрузки изображения", Toast.LENGTH_SHORT).show();
+            }
+        }
+        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    createMainCircle();
+                } else {
+                    Toast.makeText(this, "❌ Нужно разрешение на поверхность!", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+    }
+        }
