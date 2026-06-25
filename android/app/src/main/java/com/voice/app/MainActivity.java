@@ -252,9 +252,7 @@ public class MainActivity extends BridgeActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // ===== СНАЧАЛА ДОБАВЛЯЕМ ВСЕ КНОПКИ =====
-
-        // Кнопка ЗАКРЫТЬ
+        // ===== КНОПКА ЗАКРЫТЬ (крестик) =====
         ImageButton closeBtn = createCircleButton(createCloseIcon(), "#DD2C00");
         FrameLayout.LayoutParams closeP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.START);
         closeP.setMargins(20, 40, 0, 0);
@@ -267,7 +265,7 @@ public class MainActivity extends BridgeActivity {
         });
         mainOverlay.addView(closeBtn);
 
-        // Кнопка СВЕРНУТЬ
+        // ===== КНОПКА СВЕРНУТЬ (зелёная) =====
         ImageButton minimizeBtn = createCircleButton(createMinimizeIcon(), "#4CAF50");
         FrameLayout.LayoutParams minP = new FrameLayout.LayoutParams(70, 70, Gravity.TOP | Gravity.END);
         minP.setMargins(0, 40, 20, 0);
@@ -283,9 +281,7 @@ public class MainActivity extends BridgeActivity {
         });
         mainOverlay.addView(minimizeBtn);
 
-        // ===== КНОПКИ ПЕРСОНАЖА =====
-
-        // 1. ВЫБРАТЬ ПЕРСОНАЖА (оранжевая)
+        // ===== КНОПКА ВЫБОРА ПЕРСОНАЖА (оранжевая) =====
         ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
         FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         pickP.setMargins(0, 0, 100, 40);
@@ -293,7 +289,7 @@ public class MainActivity extends BridgeActivity {
         pickCharacterBtn.setOnClickListener(v -> pickCharacterImage());
         mainOverlay.addView(pickCharacterBtn);
 
-        // 2. ЗАКРЕПИТЬ (зелёная)
+        // ===== КНОПКА ЗАКРЕПЛЕНИЯ (зелёная) =====
         ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
         FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         fixP.setMargins(0, 0, 20, 40);
@@ -301,13 +297,14 @@ public class MainActivity extends BridgeActivity {
         fixBtn.setOnClickListener(v -> {
             if (characterManager != null && characterManager.isCharacterLoaded()) {
                 characterManager.fixCharacter();
+                Toast.makeText(this, "🔒 Персонаж зафиксирован", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Сначала загрузи персонажа", Toast.LENGTH_SHORT).show();
             }
         });
         mainOverlay.addView(fixBtn);
 
-        // 3. УДАЛИТЬ (красная)
+        // ===== КНОПКА УДАЛЕНИЯ (красная) =====
         ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
         FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
         removeP.setMargins(20, 0, 0, 40);
@@ -315,11 +312,12 @@ public class MainActivity extends BridgeActivity {
         removeBtn.setOnClickListener(v -> {
             if (characterManager != null) {
                 characterManager.removeCharacter();
+                Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
             }
         });
         mainOverlay.addView(removeBtn);
 
-        // ПОСЛЕ ВСЕХ КНОПОК ДОБАВЛЯЕМ WEBVIEW
+        // ===== WebView (сайт) =====
         mainOverlay.addView(webView);
 
         mainOverlayParams = new WindowManager.LayoutParams(
@@ -493,4 +491,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-    }
+                        }
