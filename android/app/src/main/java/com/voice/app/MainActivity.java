@@ -91,7 +91,8 @@ public class MainActivity extends BridgeActivity {
         }
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        characterManager = new OverlayCharacterManager(windowManager);
+        // ИСПРАВЛЕНО: передаём this как Context
+        characterManager = new OverlayCharacterManager(this, windowManager);
     }
 
     private void requestPermissionsIfNeeded() {
@@ -489,4 +490,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-                             }
+}
