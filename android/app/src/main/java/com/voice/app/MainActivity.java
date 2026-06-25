@@ -46,6 +46,7 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
+    private static final int REQUEST_VPN = 999;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -121,7 +122,7 @@ public class MainActivity extends BridgeActivity {
     // ===== ПРОКСИ =====
     private void setupProxy(boolean enable) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            Toast.makeText(this, "Прокси не поддерживается на этом устройстве", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Прокси не поддерживается", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -177,6 +178,33 @@ public class MainActivity extends BridgeActivity {
         if (prefs.getBoolean("enabled", false)) {
             setupProxy(true);
         }
+    }
+
+    // ===== VPN =====
+    private void toggleVpn() {
+        if (VpnService.isRunning) {
+            stopVpn();
+        } else {
+            startVpn();
+        }
+    }
+
+    private void startVpn() {
+        Intent intent = new Intent(this, VpnService.class);
+        if (android.net.VpnService.prepare(this) != null) {
+            Intent prepareIntent = android.net.VpnService.prepare(this);
+            startActivityForResult(prepareIntent, REQUEST_VPN);
+        } else {
+            ContextCompat.startForegroundService(this, intent);
+            Toast.makeText(this, "🛡️ VPN включён", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopVpn() {
+        Intent intent = new Intent(this, VpnService.class);
+        intent.setAction("STOP");
+        startService(intent);
+        Toast.makeText(this, "🔓 VPN выключен", Toast.LENGTH_SHORT).show();
     }
 
     // ===== ГЛАВНЫЙ КРУЖОК =====
@@ -358,11 +386,23 @@ public class MainActivity extends BridgeActivity {
             proxyBtn.setBackground(createCircleButtonBackground(isProxyEnabled ? "#4CAF50" : "#FF9800"));
         });
 
+        // КНОПКА VPN
+        ImageButton vpnBtn = createCircleButton(createVpnIcon(), VpnService.isRunning ? "#4CAF50" : "#FF9800");
+        FrameLayout.LayoutParams vpnP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
+        vpnP.setMargins(0, 0, 0, 40);
+        vpnBtn.setLayoutParams(vpnP);
+        vpnBtn.setOnClickListener(v -> {
+            toggleVpn();
+            vpnBtn.setImageDrawable(createVpnIcon());
+            vpnBtn.setBackground(createCircleButtonBackground(VpnService.isRunning ? "#4CAF50" : "#FF9800"));
+        });
+
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
         mainOverlay.addView(settingsBtn);
         mainOverlay.addView(proxyBtn);
+        mainOverlay.addView(vpnBtn);
 
         mainOverlayParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -458,6 +498,30 @@ public class MainActivity extends BridgeActivity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
+    private Drawable createVpnIcon() {
+        Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStrokeWidth(6);
+        p.setStyle(Paint.Style.STROKE);
+
+        float cx = 30, cy = 30;
+        c.drawLine(cx - 18, cy - 5, cx - 18, cy + 12, p);
+        c.drawLine(cx - 18, cy - 5, cx, cy - 15, p);
+        c.drawLine(cx + 18, cy - 5, cx, cy - 15, p);
+        c.drawLine(cx + 18, cy - 5, cx + 18, cy + 12, p);
+        c.drawLine(cx - 18, cy + 12, cx, cy + 22, p);
+        c.drawLine(cx + 18, cy + 12, cx, cy + 22, p);
+
+        p.setStrokeWidth(4);
+        c.drawLine(cx - 8, cy + 2, cx - 2, cy + 10, p);
+        c.drawLine(cx - 2, cy + 10, cx + 10, cy - 6, p);
+
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
+    }
+
     private Drawable createCloseIcon() {
         Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
@@ -498,6 +562,20 @@ public class MainActivity extends BridgeActivity {
         super.onPause();
         if (mainCircle != null && !isMainOverlayVisible) {
             mainCircle.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_VPN) {
+            if (resultCode == RESULT_OK) {
+                Intent intent = new Intent(this, VpnService.class);
+                ContextCompat.startForegroundService(this, intent);
+                Toast.makeText(this, "🛡️ VPN включён", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "❌ VPN не разрешён", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
