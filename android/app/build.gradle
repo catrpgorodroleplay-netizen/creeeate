@@ -29,7 +29,6 @@ android {
 repositories {
     google()
     mavenCentral()
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -39,9 +38,6 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'androidx.webkit:webkit:1.7.0'
-    
-    // === VPN ЧЕРЕЗ SOCKS5 (работает без tun2socks) ===
-    implementation 'com.github.hexjoker:tinyvpn:1.0.6'
     
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
