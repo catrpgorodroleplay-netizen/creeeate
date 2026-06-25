@@ -26,6 +26,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -56,7 +57,7 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // --- ПЕРСОНАЖ (всё в одном классе) ---
+    // --- ПЕРСОНАЖ (всё внутри) ---
     private ImageView characterView;
     private WindowManager.LayoutParams charParams;
     private boolean isCharacterFixed = false;
@@ -570,4 +571,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-    }
+            }
