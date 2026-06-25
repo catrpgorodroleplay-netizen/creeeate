@@ -39,6 +39,7 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_MICROPHONE = 100;
     private static final int REQUEST_CAMERA = 102;
     private static final int REQUEST_OVERLAY_PERMISSION = 101;
+    private static final int REQUEST_PICK_IMAGE = 999;
 
     private WindowManager windowManager;
     public static ImageButton mainCircle;
@@ -53,7 +54,7 @@ public class MainActivity extends BridgeActivity {
     private int initialX, initialY;
     private boolean isDragging = false;
 
-    // === ПЕРСОНАЖ (ОВЕРЛЕЙ) ===
+    // === ПЕРСОНАЖ ===
     private OverlayCharacterManager characterManager;
 
     @Override
@@ -89,7 +90,6 @@ public class MainActivity extends BridgeActivity {
             });
         }
 
-        // === ИНИЦИАЛИЗАЦИЯ МЕНЕДЖЕРА ПЕРСОНАЖА ===
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         characterManager = new OverlayCharacterManager(windowManager);
     }
@@ -112,6 +112,12 @@ public class MainActivity extends BridgeActivity {
                         new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_MICROPHONE);
             }
         }
+    }
+
+    private void pickCharacterImage() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("image/*");
+        startActivityForResult(Intent.createChooser(intent, "Выберите изображение персонажа"), REQUEST_PICK_IMAGE);
     }
 
     // ===== ГЛАВНЫЙ КРУЖОК =====
@@ -193,7 +199,7 @@ public class MainActivity extends BridgeActivity {
         return bitmap;
     }
 
-    // ===== ОВЕРЛЕЙ С САЙТОМ =====
+    // ===== ОВЕРЛЕЙ =====
     private void toggleMainOverlay() {
         if (isMainOverlayVisible) {
             hideMainOverlay();
@@ -271,33 +277,26 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // === КНОПКА ДЛЯ ПЕРСОНАЖА ===
-        ImageButton characterBtn = createCircleButton(createCharacterIcon(), "#FF5722");
-        FrameLayout.LayoutParams charP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
-        charP.setMargins(20, 0, 0, 120);
-        characterBtn.setLayoutParams(charP);
-        characterBtn.setOnClickListener(v -> {
-            // Загружаем персонажа из ресурсов (нужна картинка)
-            Bitmap characterBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.character);
-            if (characterBitmap != null) {
-                characterManager.loadCharacter(characterBitmap);
-                Toast.makeText(this, "🦸 Персонаж загружен! Перетащи, затем нажми 'Закрепить'", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, "❌ Добавь картинку character.png в res/drawable", Toast.LENGTH_SHORT).show();
-            }
-        });
+        // КНОПКА ВЫБОРА ПЕРСОНАЖА
+        ImageButton pickCharacterBtn = createCircleButton(createCharacterIcon(), "#FF9800");
+        FrameLayout.LayoutParams pickP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.START);
+        pickP.setMargins(20, 0, 0, 120);
+        pickCharacterBtn.setLayoutParams(pickP);
+        pickCharacterBtn.setOnClickListener(v -> pickCharacterImage());
+        mainOverlay.addView(pickCharacterBtn);
 
-        // === КНОПКА ЗАКРЕПЛЕНИЯ ПЕРСОНАЖА ===
+        // КНОПКА ЗАКРЕПЛЕНИЯ
         ImageButton fixBtn = createCircleButton(createFixIcon(), "#4CAF50");
         FrameLayout.LayoutParams fixP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.CENTER);
         fixP.setMargins(0, 0, 0, 40);
         fixBtn.setLayoutParams(fixP);
         fixBtn.setOnClickListener(v -> {
             characterManager.fixCharacter();
-            Toast.makeText(this, "🔒 Персонаж зафиксирован! Не реагирует на нажатия", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "🔒 Персонаж зафиксирован", Toast.LENGTH_SHORT).show();
         });
+        mainOverlay.addView(fixBtn);
 
-        // === КНОПКА УДАЛЕНИЯ ПЕРСОНАЖА ===
+        // КНОПКА УДАЛЕНИЯ
         ImageButton removeBtn = createCircleButton(createRemoveIcon(), "#E53935");
         FrameLayout.LayoutParams removeP = new FrameLayout.LayoutParams(70, 70, Gravity.BOTTOM | Gravity.END);
         removeP.setMargins(0, 0, 20, 120);
@@ -306,11 +305,12 @@ public class MainActivity extends BridgeActivity {
             characterManager.removeCharacter();
             Toast.makeText(this, "🗑 Персонаж удалён", Toast.LENGTH_SHORT).show();
         });
+        mainOverlay.addView(removeBtn);
 
         mainOverlay.addView(webView);
         mainOverlay.addView(closeBtn);
         mainOverlay.addView(minimizeBtn);
-        mainOverlay.addView(characterBtn);
+        mainOverlay.addView(pickCharacterBtn);
         mainOverlay.addView(fixBtn);
         mainOverlay.addView(removeBtn);
 
@@ -336,7 +336,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ===== ИКОНКИ ДЛЯ КНОПОК =====
+    // ===== ИКОНКИ =====
     private Drawable createCharacterIcon() {
         Bitmap b = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
@@ -345,15 +345,12 @@ public class MainActivity extends BridgeActivity {
         p.setColor(Color.WHITE);
         p.setStrokeWidth(6);
         p.setStyle(Paint.Style.STROKE);
-
-        // Человечек
-        c.drawCircle(30, 20, 12, p); // голова
-        c.drawLine(30, 32, 30, 48, p); // тело
-        c.drawLine(30, 36, 18, 26, p); // левая рука
-        c.drawLine(30, 36, 42, 26, p); // правая рука
-        c.drawLine(30, 48, 20, 58, p); // левая нога
-        c.drawLine(30, 48, 40, 58, p); // правая нога
-
+        c.drawCircle(30, 20, 12, p);
+        c.drawLine(30, 32, 30, 48, p);
+        c.drawLine(30, 36, 18, 26, p);
+        c.drawLine(30, 36, 42, 26, p);
+        c.drawLine(30, 48, 20, 58, p);
+        c.drawLine(30, 48, 40, 58, p);
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
@@ -365,14 +362,11 @@ public class MainActivity extends BridgeActivity {
         p.setColor(Color.WHITE);
         p.setStrokeWidth(6);
         p.setStyle(Paint.Style.STROKE);
-
-        // Замок
         float cx = 30, cy = 30;
         c.drawRect(cx - 10, cy + 5, cx + 10, cy + 25, p);
         c.drawLine(cx - 6, cy + 5, cx - 6, cy - 5, p);
         c.drawLine(cx + 6, cy + 5, cx + 6, cy - 5, p);
         c.drawArc(cx - 10, cy - 15, cx + 10, cy - 5, 0, 180, false, p);
-
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
@@ -384,11 +378,9 @@ public class MainActivity extends BridgeActivity {
         p.setColor(Color.WHITE);
         p.setStrokeWidth(8);
         p.setStyle(Paint.Style.STROKE);
-
         float cx = 30, cy = 30, o = 18;
         c.drawLine(cx - o, cy - o, cx + o, cy + o, p);
         c.drawLine(cx + o, cy - o, cx - o, cy + o, p);
-
         return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
@@ -439,6 +431,21 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
+            Uri imageUri = data.getData();
+            try {
+                Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
+                characterManager.loadCharacter(bitmap);
+                Toast.makeText(this, "🦸 Персонаж загружен! Перетащи, затем нажми 'Закрепить'", Toast.LENGTH_LONG).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         if (mainCircle != null && !isMainOverlayVisible) {
@@ -463,7 +470,6 @@ public class MainActivity extends BridgeActivity {
         if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
             windowManager.removeView(mainOverlay);
         }
-        // Удаляем персонажа
         if (characterManager != null) {
             characterManager.removeCharacter();
         }
@@ -483,4 +489,4 @@ public class MainActivity extends BridgeActivity {
             }
         }
     }
-    }
+                             }
