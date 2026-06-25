@@ -80,6 +80,9 @@ public class MainActivity extends BridgeActivity {
     private float lastTouchX, lastTouchY;
     private float initialPinchDistance = 0;
     private float currentScale = 1.0f;
+    
+    // Для меню
+    private FrameLayout menuContainer;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -229,7 +232,7 @@ public class MainActivity extends BridgeActivity {
     // ==================== МЕНЮ ПЕРСОНАЖА ====================
 
     private void showCharacterMenu() {
-        FrameLayout menuContainer = new FrameLayout(this);
+        menuContainer = new FrameLayout(this);
         menuContainer.setBackgroundColor(Color.parseColor("#CC000000"));
         
         // Создаем меню с кнопками
@@ -252,7 +255,7 @@ public class MainActivity extends BridgeActivity {
         loadBtn.setBackgroundColor(Color.parseColor("#2196F3"));
         loadBtn.setPadding(30, 20, 30, 20);
         loadBtn.setOnClickListener(v -> {
-            removeCharacterMenu(menuContainer);
+            removeCharacterMenu();
             openGallery();
         });
         
@@ -263,7 +266,7 @@ public class MainActivity extends BridgeActivity {
         exampleBtn.setBackgroundColor(Color.parseColor("#4CAF50"));
         exampleBtn.setPadding(30, 20, 30, 20);
         exampleBtn.setOnClickListener(v -> {
-            removeCharacterMenu(menuContainer);
+            removeCharacterMenu();
             loadExampleCharacter();
         });
         
@@ -274,7 +277,7 @@ public class MainActivity extends BridgeActivity {
         webBtn.setBackgroundColor(Color.parseColor("#FF9800"));
         webBtn.setPadding(30, 20, 30, 20);
         webBtn.setOnClickListener(v -> {
-            removeCharacterMenu(menuContainer);
+            removeCharacterMenu();
             showMainOverlay();
         });
         
@@ -284,7 +287,7 @@ public class MainActivity extends BridgeActivity {
         closeBtn.setTextColor(Color.WHITE);
         closeBtn.setBackgroundColor(Color.parseColor("#F44336"));
         closeBtn.setPadding(30, 20, 30, 20);
-        closeBtn.setOnClickListener(v -> removeCharacterMenu(menuContainer));
+        closeBtn.setOnClickListener(v -> removeCharacterMenu());
         
         int margin = 20;
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -319,10 +322,11 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void removeCharacterMenu(FrameLayout menu) {
-        if (menu != null && windowManager != null) {
+    private void removeCharacterMenu() {
+        if (menuContainer != null && windowManager != null) {
             try {
-                windowManager.removeView(menu);
+                windowManager.removeView(menuContainer);
+                menuContainer = null;
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -446,7 +450,7 @@ public class MainActivity extends BridgeActivity {
     private void addCharacterControls(FrameLayout container) {
         // Кнопка фиксации
         ImageButton fixButton = new ImageButton(this);
-        fixButton.setImageResource(android.R.drawable.ic_lock_lock);
+        fixButton.setImageDrawable(createLockIcon(false));
         GradientDrawable fixBg = new GradientDrawable();
         fixBg.setShape(GradientDrawable.OVAL);
         fixBg.setColor(Color.parseColor("#FF6B00"));
@@ -461,21 +465,22 @@ public class MainActivity extends BridgeActivity {
             isCharacterFixed = !isCharacterFixed;
             if (isCharacterFixed) {
                 Toast.makeText(this, "🔒 Персонаж зафиксирован!", Toast.LENGTH_SHORT).show();
-                fixButton.setImageResource(android.R.drawable.ic_lock_lock);
-                // Делаем персонажа "невидимым" для тачей
+                fixButton.setImageDrawable(createLockIcon(true));
                 characterView.setClickable(false);
                 characterView.setFocusable(false);
+                characterView.setAlpha(0.5f);
             } else {
                 Toast.makeText(this, "🔓 Персонаж разблокирован", Toast.LENGTH_SHORT).show();
-                fixButton.setImageResource(android.R.drawable.ic_lock_idle);
+                fixButton.setImageDrawable(createLockIcon(false));
                 characterView.setClickable(true);
                 characterView.setFocusable(true);
+                characterView.setAlpha(1.0f);
             }
         });
         
         // Кнопка удаления
         ImageButton deleteButton = new ImageButton(this);
-        deleteButton.setImageResource(android.R.drawable.ic_delete);
+        deleteButton.setImageDrawable(createDeleteIcon());
         GradientDrawable deleteBg = new GradientDrawable();
         deleteBg.setShape(GradientDrawable.OVAL);
         deleteBg.setColor(Color.RED);
@@ -490,9 +495,9 @@ public class MainActivity extends BridgeActivity {
             removeCharacter();
         });
         
-        // Кнопка назад (закрыть персонажа)
+        // Кнопка назад
         ImageButton backButton = new ImageButton(this);
-        backButton.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        backButton.setImageDrawable(createBackIcon());
         GradientDrawable backBg = new GradientDrawable();
         backBg.setShape(GradientDrawable.OVAL);
         backBg.setColor(Color.parseColor("#9C27B0"));
@@ -575,7 +580,6 @@ public class MainActivity extends BridgeActivity {
                     
                 case MotionEvent.ACTION_MOVE:
                     if (event.getPointerCount() == 2) {
-                        // Масштабирование
                         float distance = getDistance(event);
                         if (initialPinchDistance == 0) {
                             initialPinchDistance = distance;
@@ -589,7 +593,6 @@ public class MainActivity extends BridgeActivity {
                             }
                         }
                     } else {
-                        // Перемещение
                         float dx = event.getRawX() - lastTouchX;
                         float dy = event.getRawY() - lastTouchY;
                         characterParams.x += (int) dx;
@@ -639,16 +642,96 @@ public class MainActivity extends BridgeActivity {
                 int g = Color.green(pixel);
                 int b = Color.blue(pixel);
                 
-                // Проверяем зеленый фон с tolerance
                 if (g > r + tolerance && g > b + tolerance) {
-                    // Делаем прозрачным
-                    canvas.drawPoint(x, y, Color.TRANSPARENT);
+                    paint.setColor(Color.TRANSPARENT);
+                    canvas.drawPoint(x, y, paint);
                 } else {
-                    canvas.drawPoint(x, y, pixel);
+                    paint.setColor(pixel);
+                    canvas.drawPoint(x, y, paint);
                 }
             }
         }
         return result;
+    }
+
+    // ==================== МЕТОДЫ ДЛЯ ИКОНОК ====================
+
+    private Drawable createLockIcon(boolean locked) {
+        Bitmap b = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(6);
+        
+        float cx = 40, cy = 40;
+        
+        // Дуга замка
+        c.drawArc(cx - 25, cy - 35, cx + 25, cy - 5, 0, 180, false, p);
+        
+        // Тело замка
+        c.drawRect(cx - 20, cy - 10, cx + 20, cy + 25, p);
+        
+        // Скважина
+        p.setStyle(Paint.Style.FILL);
+        p.setStrokeWidth(0);
+        c.drawCircle(cx, cy + 8, 5, p);
+        
+        if (locked) {
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(8);
+            p.setColor(Color.YELLOW);
+            c.drawLine(cx - 30, cy - 20, cx + 30, cy + 30, p);
+            c.drawLine(cx + 30, cy - 20, cx - 30, cy + 30, p);
+        }
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
+    }
+
+    private Drawable createDeleteIcon() {
+        Bitmap b = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(8);
+        
+        float cx = 40, cy = 40;
+        
+        // Верхняя часть
+        c.drawLine(cx - 25, cy - 20, cx + 25, cy - 20, p);
+        c.drawLine(cx - 15, cy - 30, cx + 15, cy - 30, p);
+        c.drawLine(cx - 25, cy - 20, cx - 25, cy + 20, p);
+        c.drawLine(cx + 25, cy - 20, cx + 25, cy + 20, p);
+        
+        // Ручка
+        c.drawArc(cx - 20, cy - 35, cx + 20, cy - 15, 0, 180, false, p);
+        
+        // Крестик
+        p.setStrokeWidth(6);
+        c.drawLine(cx - 12, cy, cx + 12, cy, p);
+        c.drawLine(cx, cy - 12, cx, cy + 12, p);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
+    }
+
+    private Drawable createBackIcon() {
+        Bitmap b = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setColor(Color.WHITE);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(8);
+        
+        float cx = 40, cy = 40;
+        c.drawLine(cx + 20, cy - 20, cx - 20, cy, p);
+        c.drawLine(cx + 20, cy + 20, cx - 20, cy, p);
+        c.drawLine(cx + 20, cy - 20, cx + 20, cy + 20, p);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), b);
     }
 
     // ==================== WEBVIEW ОВЕРЛЕЙ ====================
@@ -807,86 +890,4 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        if (mainCircle != null && !isMainOverlayVisible && !isCharacterModeActive) {
-            mainCircle.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (mainCircle != null && !isMainOverlayVisible && !isCharacterModeActive) {
-            mainCircle.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (mainCircle != null && windowManager != null) {
-            try {
-                windowManager.removeView(mainCircle);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        if (mainOverlay != null && windowManager != null && isMainOverlayVisible) {
-            try {
-                windowManager.removeView(mainOverlay);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        if (characterContainer != null && windowManager != null) {
-            try {
-                windowManager.removeView(characterContainer);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
-        super.onRequestPermissionsResult(code, perms, results);
-        if (code == REQUEST_MICROPHONE && results.length > 0) {
-            if (results[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "🎤 Микрофон разрешён", Toast.LENGTH_SHORT).show();
-            }
-        }
-        if (code == REQUEST_CAMERA && results.length > 0) {
-            if (results[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "📷 Камера разрешена", Toast.LENGTH_SHORT).show();
-            }
-        }
-        if (code == REQUEST_STORAGE && results.length > 0) {
-            if (results[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "📁 Доступ к хранилищу разрешен", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_GALLERY && resultCode == RESULT_OK && data != null) {
-            Uri imageUri = data.getData();
-            try {
-                Bitmap original = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-                showCharacterOnScreen(original);
-            } catch (IOException e) {
-                e.printStackTrace();
-                Toast.makeText(this, "❌ Ошибка загрузки изображения", Toast.LENGTH_SHORT).show();
-            }
-        }
-        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Settings.canDrawOverlays(this)) {
-                    createMainCircle();
-                } else {
-                    Toast.makeText(this, "❌ Нужно разрешение на поверхность!", Toast.LENGTH_LONG).show();
-                }
-            }
-        }
-    }
-        }
+       
