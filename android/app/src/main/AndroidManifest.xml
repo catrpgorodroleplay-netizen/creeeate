@@ -2,42 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.voice.app">
 
-    <!-- Интернет и сеть -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- Аудио и Камера (для WebView и голоса) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
-    <!-- Фоновые сервисы и уведомления -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    
-    <!-- ===== СПЕЦИАЛЬНЫЕ РАЗРЕШЕНИЯ ДЛЯ ТВОЕГО ГЕЙМПАДА ===== -->
-    <!-- Для плавающего окна поверх всех игр -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    
-    <!-- Для того чтобы программа могла кликать по экрану (Автокликер) -->
-    <uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" />
-    
-    <!-- Для захвата экрана и создания скриншотов (нужно для стиков) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    
-    <!-- Для вибрации при нажатии кнопок (как на джойконах) -->
-    <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Для Android 13+ (Tiramisu) чтение изображений -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    
-    <!-- Для старых версий Android -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -48,7 +24,6 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
 
-        <!-- Главная активность -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -63,7 +38,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Фоновый сервис микрофона -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
@@ -74,21 +48,6 @@
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
-        <!-- ===== СПЕЦИАЛЬНЫЙ СЕРВИС ДОСТУПНОСТИ (АВТОКЛИКЕР) ===== -->
-        <!-- Без этого сервиса Android не позволит программе кликать по другим приложениям -->
-        <service
-            android:name=".AutoClickerAccessibilityService"
-            android:exported="true"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_config" />
-        </service>
-
-        <!-- Провайдер для сохранения картинок -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
