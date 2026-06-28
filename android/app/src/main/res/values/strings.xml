@@ -4,5 +4,4 @@
     <string name="title_activity_main">VoiceChat</string>
     <string name="package_name">com.voice.app</string>
     <string name="custom_url_scheme">com.voice.app</string>
-    <string name="accessibility_service_description">Это приложение использует Службу специальных возможностей для выполнения кликов и жестов в играх и приложениях по вашему запросу.</string>
 </resources>
