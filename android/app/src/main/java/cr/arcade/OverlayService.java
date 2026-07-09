@@ -33,7 +33,7 @@ public class OverlayService extends Service {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("CR Arcade")
                 .setContentText("Оверлей активен. Нажмите для открытия")
-                .setSmallIcon(android.R.drawable.ic_menu_game)
+                .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
