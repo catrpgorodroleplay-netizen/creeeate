@@ -1,6 +1,6 @@
 {
-  "appId": "com.voice.app",
-  "appName": "VoiceChat",
+  "appId": "com.cr.arcade",
+  "appName": "CR Arcade",
   "webDir": "www",
   "server": {
     "url": "https://crconferensimessenger.vercel.app/",
