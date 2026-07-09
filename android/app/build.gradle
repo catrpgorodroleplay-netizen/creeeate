@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.voice.app"
+    namespace "com.cr.arcade"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.voice.app"
+        applicationId "com.cr.arcade"
         minSdk = rootProject.ext.minSdkVersion
         targetSdk = rootProject.ext.targetSdkVersion
         versionCode 1
