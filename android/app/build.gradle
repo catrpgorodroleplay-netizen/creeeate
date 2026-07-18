@@ -29,10 +29,6 @@ android {
 repositories {
     google()
     mavenCentral()
-    // Добавляем репозиторий для Filament
-    maven {
-        url 'https://maven.google.com'
-    }
 }
 
 dependencies {
@@ -42,10 +38,6 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'androidx.webkit:webkit:1.7.0'
-    
-    // ============ 3D МОДЕЛИ (Filament) ============
-    implementation 'com.google.android.filament:filament-android:1.51.0'
-    implementation 'com.google.android.filament:gltfio-android:1.51.0'
     
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
