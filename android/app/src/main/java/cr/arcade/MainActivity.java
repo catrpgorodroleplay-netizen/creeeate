@@ -85,7 +85,7 @@ public class MainActivity extends BridgeActivity {
 
     private static final String URL_HOME = "https://wyikhedfghhopyewfvjkurrhncswehipkhf.vercel.app/";
     private static final String URL_SETTINGS = "https://whuokhgrdcbnmkloplureecvjiqoendu.vercel.app/";
-    private static final String URL_WEB_OVERLAY = "https://acojnehucijwbyqofufhwnwkrofucyksmnxh.vercel.app/";
+    private static final String URL_WEB_OVERLAY = "https://acojnehucijwbyqofufhwnwkrofucyksmnx.vercel.app/";
     private static final String TAG = "MainActivity";
 
     private WindowManager windowManager;
