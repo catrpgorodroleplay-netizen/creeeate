@@ -2,13 +2,7 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagReportViewIds|flagRequestTouchExplorationMode"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="100"
-    android:packageNames=""
-    android:settingsActivity="com.cr.arcade.MainActivity"
-    android:canRequestTouchExplorationMode="true"
-    android:canRequestEnhancedWebAccessibility="true"
-    android:canRequestFilterKeyEvents="true"
-    android:canPerformGestures="true" />
+    android:settingsActivity="com.cr.arcade.MainActivity" />
