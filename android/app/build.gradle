@@ -53,22 +53,22 @@ dependencies {
     // ============ OCR ============
     implementation 'com.rmtheis:tess-two:9.1.0'
     
-    // Google ML Kit (понижаем версии)
-    implementation 'com.google.mlkit:text-recognition:16.0.0'
-    implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
-    implementation 'com.google.mlkit:text-recognition-devanagari:16.0.0'
-    implementation 'com.google.mlkit:text-recognition-japanese:16.0.0'
-    implementation 'com.google.mlkit:text-recognition-korean:16.0.0'
-    
-    // ============ ПОНИЖАЕМ ВЕРСИИ ============
-    // Вместо 1.17.0 используем старую версию
-    implementation 'androidx.core:core:1.10.0'
-    
+    // ============ ДРУГОЕ ============
     implementation 'com.github.bumptech.glide:glide:4.15.1'
     implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'androidx.work:work-runtime:2.8.1'
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    
+    // ============ ПРИНУДИТЕЛЬНО ПОНИЖАЕМ ВЕРСИЮ CORE ============
+    implementation 'androidx.core:core:1.10.0'
+}
+
+// ============ ПРИНУДИТЕЛЬНО ПОНИЖАЕМ ВСЕ ВЕРСИИ ============
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.core:core:1.10.0'
+        force 'androidx.core:core-ktx:1.10.0'
+    }
 }
 
 apply from: 'capacitor.build.gradle'
