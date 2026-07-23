@@ -21,7 +21,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <!-- Разрешения для аудио (опционально) -->
+    <!-- Разрешения для аудио/камеры (опционально) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -51,7 +51,21 @@
             </intent-filter>
         </activity>
 
-        <!-- Сервис для оверлея -->
+        <!-- СЕРВИС СПЕЦИАЛЬНЫХ ВОЗМОЖНОСТЕЙ (Accessibility Service) -->
+        <service
+            android:name=".ScreenReaderService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Обычные сервисы -->
         <service
             android:name=".OverlayService"
             android:foregroundServiceType="specialUse"
