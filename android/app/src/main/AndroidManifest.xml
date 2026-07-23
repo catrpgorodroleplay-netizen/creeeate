@@ -25,9 +25,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ЗАХВАТА ЭКРАНА ==================== -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    
     <!-- ==================== ФИЧИ ==================== -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
