@@ -6,7 +6,7 @@ android {
     
     defaultConfig {
         applicationId "com.cr.arcade"
-        minSdk 22
+        minSdk 24  // ← МЕНЯЕМ НА 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -35,41 +35,17 @@ repositories {
 }
 
 dependencies {
-    // ============ CAPACITOR ============
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
     implementation 'androidx.core:core-splashscreen:1.0.0'
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
-    
-    // ============ WEBVIEW ============
     implementation 'androidx.webkit:webkit:1.7.0'
+    implementation 'com.rmtheis:tess-two:9.1.0'
     
-    // ============ ТЕСТИРОВАНИЕ ============
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    
-    // ============ OCR ============
-    implementation 'com.rmtheis:tess-two:9.1.0'
-    
-    // ============ ПРИНУДИТЕЛЬНО СТАРЫЕ ВЕРСИИ ============
-    implementation 'androidx.core:core:1.9.0'
-    implementation 'androidx.activity:activity:1.7.0'
-    implementation 'androidx.fragment:fragment:1.6.0'
-}
-
-// ============ ПРИНУДИТЕЛЬНО ПОНИЖАЕМ ВСЕ ВЕРСИИ ============
-configurations.all {
-    resolutionStrategy {
-        force 'androidx.core:core:1.9.0'
-        force 'androidx.core:core-ktx:1.9.0'
-        force 'androidx.activity:activity:1.7.0'
-        force 'androidx.activity:activity-ktx:1.7.0'
-        force 'androidx.fragment:fragment:1.6.0'
-        force 'androidx.fragment:fragment-ktx:1.6.0'
-        force 'androidx.appcompat:appcompat:1.6.1'
-    }
 }
 
 apply from: 'capacitor.build.gradle'
