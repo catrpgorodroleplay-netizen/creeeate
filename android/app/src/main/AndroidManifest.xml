@@ -2,30 +2,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Основные разрешения -->
+    <!-- ==================== ОСНОВНЫЕ РАЗРЕШЕНИЯ ==================== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
     
-    <!-- Разрешения для оверлея и фона -->
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ХРАНИЛИЩА ==================== -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ОВЕРЛЕЯ И ФОНА ==================== -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
-    <!-- Разрешения для скриншотов и захвата экрана -->
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ЗАХВАТА ЭКРАНА ==================== -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
-    <!-- Для Android 14+ -->
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <!-- ==================== ФИЧИ ==================== -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -34,8 +40,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
+        android:hardwareAccelerated="true">
 
+        <!-- ==================== MAIN ACTIVITY ==================== -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -43,33 +52,48 @@
             android:launchMode="singleTask"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Сервис для фоновой работы оверлея -->
+        <!-- ==================== СЕРВИС ОВЕРЛЕЯ ==================== -->
         <service
             android:name=".OverlayService"
-            android:foregroundServiceType="specialUse|mediaProjection"
-            android:exported="false">
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.foreground_service_type"
                 android:value="specialUse|mediaProjection" />
         </service>
 
+        <!-- ==================== ГОЛОСОВОЙ СЕРВИС ==================== -->
         <service
             android:name=".VoiceForegroundService"
-            android:foregroundServiceType="microphone"
-            android:exported="false" />
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone">
+            <property
+                android:name="android.foreground_service_type"
+                android:value="microphone" />
+        </service>
 
+        <!-- ==================== CAPACITOR СЕРВИС ==================== -->
         <service
             android:name="com.getcapacitor.CapacitorForegroundService"
-            android:foregroundServiceType="microphone"
-            android:exported="false" />
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone">
+            <property
+                android:name="android.foreground_service_type"
+                android:value="microphone" />
+        </service>
 
+        <!-- ==================== FILE PROVIDER ==================== -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -80,11 +104,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Служба для медиа-проекции (захват экрана) -->
-        <service
-            android:name=".ScreenCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+        <!-- ==================== RECEIVER ДЛЯ ЗАХВАТА ЭКРАНА ==================== -->
+        <receiver
+            android:name=".ScreenCaptureReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
+
 </manifest>
