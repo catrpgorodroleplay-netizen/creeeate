@@ -2,18 +2,15 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.cr.arcade"
-    compileSdk 36
+    compileSdk 34
     
     defaultConfig {
         applicationId "com.cr.arcade"
         minSdk 24
-        targetSdk 36
+        targetSdk 34
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        aaptOptions {
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-        }
     }
     
     buildTypes {
@@ -35,44 +32,21 @@ repositories {
 }
 
 dependencies {
-    // Capacitor
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
-    implementation 'androidx.core:core-splashscreen:1.0.0'
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
-    
-    // WebView
+    implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.webkit:webkit:1.7.0'
-    
-    // Tesseract OCR
     implementation 'com.rmtheis:tess-two:9.1.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.20"
     
-    // Тестирование
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
 
-// ПРИНУДИТЕЛЬНО СТАРЫЕ ВЕРСИИ БИБЛИОТЕК
 configurations.all {
-    resolutionStrategy {
-        force 'androidx.core:core:1.9.0'
-        force 'androidx.core:core-ktx:1.9.0'
-        force 'androidx.activity:activity:1.7.0'
-        force 'androidx.activity:activity-ktx:1.7.0'
-        force 'androidx.fragment:fragment:1.6.0'
-        force 'androidx.appcompat:appcompat:1.6.1'
-    }
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
 }
 
 apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}
