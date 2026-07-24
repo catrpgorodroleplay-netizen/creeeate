@@ -1,69 +1,28 @@
-apply plugin: 'com.android.application'
-
-android {
-    namespace "com.cr.arcade"
-    compileSdk 34
-    
-    defaultConfig {
-        applicationId "com.cr.arcade"
-        minSdk 23
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        aaptOptions {
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-        }
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
     }
-    
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
-    
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.0'
     }
 }
 
-repositories {
-    google()
-    mavenCentral()
-}
-
-dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
-    implementation 'androidx.core:core-splashscreen:1.0.1'
-    implementation 'androidx.webkit:webkit:1.8.0'
-    
-    // Capacitor
-    implementation project(':capacitor-android')
-    implementation project(':capacitor-cordova-android-plugins')
-    
-    // ============ ML Kit для OCR ============
-    implementation 'com.google.mlkit:text-recognition:16.0.0'
-    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:16.0.0'
-    
-    // ============ Дополнительные зависимости ============
-    implementation 'com.google.android.gms:play-services-base:18.2.0'
-    
-    // Тестирование
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-}
-
-apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
     }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
 }
