@@ -56,7 +56,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
 
-// ============ ПЕРЕОПРЕДЕЛЯЕМ ВЕРСИИ ЗАВИСИМОСТЕЙ ============
+// ============ ПЕРЕОПРЕДЕЛЯЕМ ВЕРСИИ ============
 configurations.all {
     resolutionStrategy {
         force 'androidx.core:core:1.12.0'
