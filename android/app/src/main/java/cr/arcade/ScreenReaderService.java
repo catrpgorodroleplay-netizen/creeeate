@@ -390,4 +390,4 @@ public class ScreenReaderService extends AccessibilityService {
     public static ScreenReaderService getInstance() {
         return instance;
     }
-            }
+                }
