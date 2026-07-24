@@ -2,12 +2,12 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.cr.arcade"
-    compileSdk 35  // ← было 34, меняем на 35
+    compileSdk 35
     
     defaultConfig {
         applicationId "com.cr.arcade"
         minSdk 23
-        targetSdk 35  // ← было 34, меняем на 35
+        targetSdk 35
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
