@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#DD0D0D0D">
+
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎮 МАКРОСЫ"
+        android:textColor="#00FF00"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="8dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⏸ Готов"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"/>
+
+        <TextView
+            android:id="@+id/pointCountText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Точек: 0"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="4dp">
+
+        <Button
+            android:id="@+id/addPointBtn"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="➕"
+            android:textSize="18sp"
+            android:background="@drawable/macro_button_green"
+            android:layout_margin="2dp"/>
+
+        <Button
+            android:id="@+id/recordBtn"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="🔴"
+            android:textSize="18sp"
+            android:background="@drawable/macro_button_red"
+            android:layout_margin="2dp"/>
+
+        <Button
+            android:id="@+id/startBtn"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="▶️"
+            android:textSize="18sp"
+            android:background="@drawable/macro_button_green"
+            android:layout_margin="2dp"/>
+
+        <Button
+            android:id="@+id/stopBtn"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="⏹"
+            android:textSize="18sp"
+            android:background="@drawable/macro_button_red"
+            android:layout_margin="2dp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="8dp">
+
+        <Button
+            android:id="@+id/clearBtn"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="🗑 Очистить"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/macro_button_dark"
+            android:layout_margin="2dp"/>
+
+        <Button
+            android:id="@+id/minimizeBtn"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="➖ Свернуть"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/macro_button_dark"
+            android:layout_margin="2dp"/>
+
+        <Button
+            android:id="@+id/closeBtn"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="✖️ Закрыть"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/macro_button_red"
+            android:layout_margin="2dp"/>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#00FF00"
+        android:layout_marginVertical="4dp"/>
+
+    <ScrollView
+        android:id="@+id/pointsScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="120dp">
+
+        <LinearLayout
+            android:id="@+id/pointsListLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="4dp"/>
+    </ScrollView>
+
+</LinearLayout>
