@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ==================== СТАНДАРТНЫЕ РАЗРЕШЕНИЯ ==================== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -8,9 +10,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ФОНОВЫХ СЕРВИСОВ ==================== -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    
+    <!-- ==================== СИСТЕМНЫЕ РАЗРЕШЕНИЯ ==================== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -18,10 +23,18 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
-    <!-- Дополнительные разрешения для макросов -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ МАКРОСОВ ==================== -->
     <uses-permission android:name="android.permission.ACCESSIBILITY_SERVICE" />
     <uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION" />
+    <uses-permission android:name="android.permission.ACTION_ACCESSIBILITY_SETTINGS" />
+    
+    <!-- ==================== ОПЦИОНАЛЬНО: ДЛЯ РАБОТЫ С ДРУГИМИ ПРИЛОЖЕНИЯМИ ==================== -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    
+    <!-- ==================== ДОПОЛНИТЕЛЬНЫЕ РАЗРЕШЕНИЯ ДЛЯ ANDROID 14+ ==================== -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -30,8 +43,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true">
 
+        <!-- ==================== ГЛАВНАЯ АКТИВНОСТЬ ==================== -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
@@ -46,12 +61,17 @@
             </intent-filter>
         </activity>
 
-        <!-- Сервис для фоновой работы оверлея -->
+        <!-- ==================== СЕРВИС ДЛЯ ФОНОВОЙ РАБОТЫ ОВЕРЛЕЯ ==================== -->
         <service
             android:name=".OverlayService"
             android:foregroundServiceType="specialUse"
-            android:exported="false" />
+            android:exported="false">
+            <property
+                android:name="android.foreground_service_type_special_use"
+                android:value="overlay_service" />
+        </service>
 
+        <!-- ==================== СЕРВИС ДЛЯ МИКРОФОНА ==================== -->
         <service
             android:name=".VoiceForegroundService"
             android:foregroundServiceType="microphone"
@@ -62,6 +82,21 @@
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
+        <!-- ==================== СЕРВИС ДЛЯ МАКРОСОВ (ACCESSIBILITY) ==================== -->
+        <service
+            android:name=".MacroService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:foregroundServiceType="mediaProjection">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ==================== FILE PROVIDER ДЛЯ SHARING ==================== -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -72,5 +107,17 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- ==================== RECEIVER ДЛЯ ЗАПУСКА ПРИ ЗАГРУЗКЕ ==================== -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
     </application>
+
 </manifest>
