@@ -3,28 +3,41 @@ package com.cr.arcade;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.VirtualDisplay;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ScreenReaderService extends AccessibilityService {
 
@@ -32,26 +45,34 @@ public class ScreenReaderService extends AccessibilityService {
     private static ScreenReaderService instance;
     private WindowManager windowManager;
     private Handler handler = new Handler(Looper.getMainLooper());
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
     
-    // Активные теги на экране
+    // OCR
+    private TextRecognizer textRecognizer;
+    
+    // Теги
     private Map<String, View> activeTags = new HashMap<>();
     private Map<String, Rect> tagPositions = new HashMap<>();
-    
-    // Список друзей
     private List<FriendData> friends = new ArrayList<>();
     private boolean friendsLoaded = false;
     private boolean isScanning = false;
+    private boolean isCapturing = false;
     
-    // Обновление тегов
-    private Runnable updateTagsRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (isScanning) {
-                scanScreen();
-                handler.postDelayed(this, 100); // Обновляем каждые 100мс для плавности
-            }
-        }
-    };
+    // Захват экрана
+    private MediaProjectionManager projectionManager;
+    private MediaProjection mediaProjection;
+    private VirtualDisplay virtualDisplay;
+    private ImageReader imageReader;
+    private int screenWidth, screenHeight;
+    private int screenDensity;
+    
+    // Колбэк для обновления лога
+    private OnScanUpdateListener scanListener;
+
+    public interface OnScanUpdateListener {
+        void onScanUpdate(Map<String, Boolean> detected);
+    }
+    private OnScanUpdateListener scanListenerInstance;
 
     private static class FriendData {
         String name;
@@ -61,11 +82,6 @@ public class ScreenReaderService extends AccessibilityService {
             this.name = name;
             this.tag = tag;
         }
-    }
-
-    @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Не используем событийный метод, сканируем по таймеру
     }
 
     @Override
@@ -81,11 +97,27 @@ public class ScreenReaderService extends AccessibilityService {
         setServiceInfo(info);
         
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         
-        Log.d(TAG, "✅ Accessibility Service Connected!");
+        // Инициализируем OCR
+        textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        
+        // Получаем размеры экрана
+        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+        windowManager.getDefaultDisplay().getMetrics(metrics);
+        screenWidth = metrics.widthPixels;
+        screenHeight = metrics.heightPixels;
+        screenDensity = metrics.densityDpi;
+        
+        Log.d(TAG, "✅ Service Connected!");
     }
 
-    public void startScanning() {
+    public void startScanning(MediaProjection projection) {
+        if (projection == null) {
+            Log.e(TAG, "Projection is null!");
+            return;
+        }
+        
         if (!friendsLoaded) {
             loadFriends();
         }
@@ -93,83 +125,126 @@ public class ScreenReaderService extends AccessibilityService {
             Log.d(TAG, "Нет друзей для сканирования");
             return;
         }
+        
+        this.mediaProjection = projection;
         isScanning = true;
-        handler.post(updateTagsRunnable);
+        isCapturing = true;
+        
+        // Создаем захват экрана
+        imageReader = ImageReader.newInstance(screenWidth, screenHeight, 
+                PixelFormat.RGBA_8888, 2);
+        
+        virtualDisplay = mediaProjection.createVirtualDisplay(
+                "ScreenCapture",
+                screenWidth, screenHeight, screenDensity,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader.getSurface(),
+                null, null
+        );
+        
+        // Запускаем сканирование
+        executor.execute(new ScanRunnable());
+        
         Log.d(TAG, "🔍 Сканирование запущено, друзей: " + friends.size());
     }
 
     public void stopScanning() {
         isScanning = false;
-        handler.removeCallbacks(updateTagsRunnable);
+        isCapturing = false;
+        
+        if (virtualDisplay != null) {
+            virtualDisplay.release();
+            virtualDisplay = null;
+        }
+        if (imageReader != null) {
+            imageReader.close();
+            imageReader = null;
+        }
+        if (mediaProjection != null) {
+            mediaProjection.stop();
+            mediaProjection = null;
+        }
+        
         removeAllTags();
         Log.d(TAG, "⏹ Сканирование остановлено");
     }
 
-    private void scanScreen() {
-        try {
-            AccessibilityNodeInfo root = getRootInActiveWindow();
-            if (root == null) {
-                // Если ничего не видно - удаляем все теги
-                if (!activeTags.isEmpty()) {
-                    removeAllTags();
+    private class ScanRunnable implements Runnable {
+        @Override
+        public void run() {
+            while (isCapturing && isScanning) {
+                try {
+                    Image image = imageReader.acquireLatestImage();
+                    if (image != null) {
+                        processImage(image);
+                        image.close();
+                    }
+                    Thread.sleep(200); // 200мс для баланса скорости и нагрузки
+                } catch (Exception e) {
+                    Log.e(TAG, "Ошибка сканирования: " + e.getMessage());
                 }
-                return;
             }
-
-            // Очищаем старые позиции
-            tagPositions.clear();
-            
-            // Сканируем все текстовые узлы
-            scanNode(root);
-            root.recycle();
-
-            // Обновляем теги
-            updateTags();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Ошибка сканирования: " + e.getMessage());
         }
     }
 
-    private void scanNode(AccessibilityNodeInfo node) {
-        if (node == null) return;
-
-        // Проверяем текст узла
-        CharSequence text = node.getText();
-        if (text != null && !TextUtils.isEmpty(text)) {
-            String textStr = text.toString().trim();
+    private void processImage(Image image) {
+        try {
+            // Конвертируем Image в Bitmap
+            Image.Plane[] planes = image.getPlanes();
+            ByteBuffer buffer = planes[0].getBuffer();
             
-            // Проверяем каждый ник
-            for (FriendData friend : friends) {
-                if (textStr.contains(friend.name) || friend.name.contains(textStr)) {
-                    // Нашли ник!
-                    Rect bounds = new Rect();
-                    node.getBoundsInScreen(bounds);
+            Bitmap bitmap = Bitmap.createBitmap(
+                    screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
+            bitmap.copyPixelsFromBuffer(buffer);
+            
+            // Распознаем текст через ML Kit
+            InputImage inputImage = InputImage.fromBitmap(bitmap, 0);
+            
+            textRecognizer.process(inputImage)
+                .addOnSuccessListener(visionText -> {
+                    // Очищаем старые позиции
+                    tagPositions.clear();
                     
-                    // Проверяем что ник видим на экране
-                    if (bounds.width() > 0 && bounds.height() > 0) {
-                        // Сохраняем позицию
-                        tagPositions.put(friend.name, bounds);
-                        Log.d(TAG, "Найден ник: " + friend.name + " на позиции: " + bounds.left + "," + bounds.top);
-                        break;
+                    // Ищем ники в распознанном тексте
+                    for (Text.TextBlock block : visionText.getTextBlocks()) {
+                        for (Text.Line line : block.getLines()) {
+                            String text = line.getText().trim();
+                            Rect bounds = line.getBoundingBox();
+                            
+                            if (bounds != null && !text.isEmpty()) {
+                                // Проверяем каждый ник
+                                for (FriendData friend : friends) {
+                                    if (text.contains(friend.name) || friend.name.contains(text)) {
+                                        tagPositions.put(friend.name, bounds);
+                                        Log.d(TAG, "✅ Найден ник: " + friend.name + " на позиции: " + bounds.left + "," + bounds.top);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-        }
-
-        // Рекурсивно проходим по всем дочерним узлам
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                scanNode(child);
-                child.recycle();
-            }
+                    
+                    // Обновляем теги и лог
+                    handler.post(() -> {
+                        updateTags();
+                        notifyScanUpdate();
+                    });
+                    
+                    bitmap.recycle();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "OCR ошибка: " + e.getMessage());
+                    bitmap.recycle();
+                });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка обработки: " + e.getMessage());
         }
     }
 
     private void updateTags() {
         try {
-            // Удаляем теги, которых больше нет на экране
+            // Удаляем теги которых нет на экране
             List<String> toRemove = new ArrayList<>();
             for (String name : activeTags.keySet()) {
                 if (!tagPositions.containsKey(name)) {
@@ -180,12 +255,11 @@ public class ScreenReaderService extends AccessibilityService {
                 removeTag(name);
             }
 
-            // Обновляем или создаем теги для найденных ников
+            // Создаем/обновляем теги
             for (Map.Entry<String, Rect> entry : tagPositions.entrySet()) {
                 String name = entry.getKey();
                 Rect bounds = entry.getValue();
                 
-                // Находим данные друга
                 FriendData friend = null;
                 for (FriendData f : friends) {
                     if (f.name.equals(name)) {
@@ -195,7 +269,6 @@ public class ScreenReaderService extends AccessibilityService {
                 }
                 if (friend == null) continue;
 
-                // Обновляем существующий тег или создаем новый
                 if (activeTags.containsKey(name)) {
                     updateTagPosition(name, bounds);
                 } else {
@@ -212,7 +285,6 @@ public class ScreenReaderService extends AccessibilityService {
         try {
             if (windowManager == null) return;
 
-            // Создаем тег
             View tagView = createTagView(friend);
             if (tagView == null) return;
             
@@ -232,15 +304,14 @@ public class ScreenReaderService extends AccessibilityService {
                     PixelFormat.TRANSLUCENT
             );
             
-            // Ставим тег ровно над ником
             params.gravity = Gravity.TOP | Gravity.START;
             params.x = bounds.left;
-            params.y = bounds.top - 50; // Немного выше ника
+            params.y = bounds.top - 50;
             
             windowManager.addView(tagView, params);
             activeTags.put(name, tagView);
             
-            Log.d(TAG, "✅ Создан тег для: " + name + " на позиции: " + params.x + "," + params.y);
+            Log.d(TAG, "✅ Создан тег: " + name);
             
         } catch (Exception e) {
             Log.e(TAG, "Ошибка создания тега: " + e.getMessage());
@@ -253,8 +324,6 @@ public class ScreenReaderService extends AccessibilityService {
             if (tagView == null) return;
             
             WindowManager.LayoutParams params = (WindowManager.LayoutParams) tagView.getLayoutParams();
-            
-            // Обновляем позицию ровно над ником
             params.x = bounds.left;
             params.y = bounds.top - 50;
             
@@ -263,7 +332,7 @@ public class ScreenReaderService extends AccessibilityService {
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка обновления позиции тега: " + e.getMessage());
+            Log.e(TAG, "Ошибка обновления позиции: " + e.getMessage());
         }
     }
 
@@ -273,7 +342,7 @@ public class ScreenReaderService extends AccessibilityService {
             if (tagView != null && windowManager != null) {
                 windowManager.removeView(tagView);
                 activeTags.remove(name);
-                Log.d(TAG, "❌ Удален тег для: " + name);
+                Log.d(TAG, "❌ Удален тег: " + name);
             }
         } catch (Exception e) {
             Log.e(TAG, "Ошибка удаления тега: " + e.getMessage());
@@ -307,7 +376,6 @@ public class ScreenReaderService extends AccessibilityService {
             bg.setStroke(3, android.graphics.Color.parseColor(color));
             tagLayout.setBackground(bg);
             
-            // Имя
             TextView nameText = new TextView(this);
             nameText.setText(friend.name);
             nameText.setTextColor(android.graphics.Color.WHITE);
@@ -316,7 +384,6 @@ public class ScreenReaderService extends AccessibilityService {
             nameText.setPadding(8, 0, 4, 0);
             tagLayout.addView(nameText);
             
-            // Тег
             TextView tagText = new TextView(this);
             tagText.setText(friend.tag);
             tagText.setTextColor(android.graphics.Color.parseColor(color));
@@ -325,7 +392,6 @@ public class ScreenReaderService extends AccessibilityService {
             tagText.setPadding(4, 2, 8, 2);
             tagLayout.addView(tagText);
             
-            // Иконка
             TextView icon = new TextView(this);
             icon.setText(friend.tag.equals("Враг") ? "⚔️" : "🤝");
             icon.setTextSize(16);
@@ -340,6 +406,20 @@ public class ScreenReaderService extends AccessibilityService {
             Log.e(TAG, "Ошибка создания тега: " + e.getMessage());
             return null;
         }
+    }
+
+    private void notifyScanUpdate() {
+        if (scanListenerInstance != null) {
+            Map<String, Boolean> detected = new HashMap<>();
+            for (FriendData friend : friends) {
+                detected.put(friend.name, tagPositions.containsKey(friend.name));
+            }
+            scanListenerInstance.onScanUpdate(detected);
+        }
+    }
+
+    public void setScanListener(OnScanUpdateListener listener) {
+        this.scanListenerInstance = listener;
     }
 
     public void loadFriends() {
@@ -374,6 +454,14 @@ public class ScreenReaderService extends AccessibilityService {
         return isScanning;
     }
 
+    public List<String> getFriendNames() {
+        List<String> names = new ArrayList<>();
+        for (FriendData f : friends) {
+            names.add(f.name);
+        }
+        return names;
+    }
+
     @Override
     public void onInterrupt() {
         Log.d(TAG, "Service interrupted");
@@ -385,9 +473,12 @@ public class ScreenReaderService extends AccessibilityService {
         instance = null;
         stopScanning();
         removeAllTags();
+        if (textRecognizer != null) {
+            textRecognizer.close();
+        }
     }
 
     public static ScreenReaderService getInstance() {
         return instance;
     }
-                }
+}
