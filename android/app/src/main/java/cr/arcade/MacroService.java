@@ -41,13 +41,14 @@ public class MacroService extends AccessibilityService {
         if (isRecording && recordingListener != null) {
             int eventType = event.getEventType();
             
-            // Ловим ВСЕ типы событий
+            // Ловим ВСЕ возможные типы событий
             if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
                 eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
                 eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
                 eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
                 eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
-                eventType == AccessibilityEvent.TYPE_VIEW_SELECTED) {
+                eventType == AccessibilityEvent.TYPE_VIEW_SELECTED ||
+                eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
                 
                 AccessibilityNodeInfo source = event.getSource();
                 if (source != null) {
@@ -57,13 +58,15 @@ public class MacroService extends AccessibilityService {
                     int x = rect.centerX();
                     int y = rect.centerY();
                     
-                    if (x > 0 && y > 0) {
+                    // Проверяем, что координаты валидные
+                    if (x > 0 && y > 0 && rect.width() > 0 && rect.height() > 0) {
                         long currentTime = System.currentTimeMillis();
                         long delay = currentTime - lastActionTime;
                         if (delay < 50) delay = 50;
                         lastActionTime = currentTime;
                         actionCount++;
                         
+                        // Отправляем в UI
                         recordingListener.onActionRecorded(x, y, delay);
                     }
                 }
@@ -135,6 +138,35 @@ public class MacroService extends AccessibilityService {
             builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 80));
             
             dispatchGesture(builder.build(), null, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void performLongClick(int x, int y) {
+        try {
+            Path clickPath = new Path();
+            clickPath.moveTo(x, y);
+            
+            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
+            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 800));
+            
+            dispatchGesture(gestureBuilder.build(), null, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void performSwipe(int x1, int y1, int x2, int y2, long duration) {
+        try {
+            Path swipePath = new Path();
+            swipePath.moveTo(x1, y1);
+            swipePath.lineTo(x2, y2);
+            
+            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
+            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
+            
+            dispatchGesture(gestureBuilder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -247,7 +279,7 @@ public class MacroService extends AccessibilityService {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     getOverlayFlag(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // ← КЛИКИ ПРОХОДЯТ!
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // КЛИКИ ПРОХОДЯТ!
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
