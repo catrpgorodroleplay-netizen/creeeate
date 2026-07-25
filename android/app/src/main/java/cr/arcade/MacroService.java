@@ -11,7 +11,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -27,9 +26,9 @@ public class MacroService extends AccessibilityService {
     private RecordingListener recordingListener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
-    private FrameLayout touchOverlay;
     private TextView recordIndicator;
     private Button stopButton;
+    private boolean isProcessingClick = false;
 
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -37,18 +36,7 @@ public class MacroService extends AccessibilityService {
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Перехватываем клики через AccessibilityService
-        if (isRecording && event != null) {
-            // Получаем координаты клика из события
-            if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED ||
-                event.getEventType() == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
-                
-                // Пробуем получить координаты из события
-                // Это не всегда работает, используем альтернативный метод
-            }
-        }
-    }
+    public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {}
 
     @Override
     public void onInterrupt() {}
@@ -63,7 +51,7 @@ public class MacroService extends AccessibilityService {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        hideTouchOverlay();
+        hideRecordIndicator();
         instance = null;
     }
 
@@ -94,8 +82,9 @@ public class MacroService extends AccessibilityService {
         this.recordingListener = listener;
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
+        this.isProcessingClick = false;
         
-        showTouchOverlay();
+        showRecordIndicator();
         
         Toast.makeText(this, "🔴 Запись начата! Кликайте в игре", Toast.LENGTH_SHORT).show();
     }
@@ -104,7 +93,8 @@ public class MacroService extends AccessibilityService {
         if (!isRecording) return;
         
         this.isRecording = false;
-        hideTouchOverlay();
+        this.isProcessingClick = false;
+        hideRecordIndicator();
         
         if (recordingListener != null) {
             recordingListener.onRecordingStopped();
@@ -124,10 +114,12 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== МЕТОД ДЛЯ ЗАПИСИ КЛИКА ИЗ ВНЕ ====================
+    // ==================== МЕТОД ДЛЯ ЗАПИСИ КЛИКА ИЗ АКТИВНОСТИ ====================
 
-    public void recordClickFromActivity(int x, int y) {
-        if (!isRecording || recordingListener == null) return;
+    public void recordClick(int x, int y) {
+        if (!isRecording || recordingListener == null || isProcessingClick) return;
+        
+        isProcessingClick = true;
         
         long currentTime = System.currentTimeMillis();
         long delay = currentTime - lastActionTime;
@@ -137,84 +129,20 @@ public class MacroService extends AccessibilityService {
             if (recordingListener != null) {
                 recordingListener.onActionRecorded(x, y, delay);
             }
+            isProcessingClick = false;
         });
     }
 
-    // ==================== ТАЧ-ОВЕРЛЕЙ (перехватывает и пропускает клики) ====================
+    // ==================== ИНДИКАТОР ЗАПИСИ (БЕЗ ПЕРЕХВАТА КЛИКОВ) ====================
 
-    private void showTouchOverlay() {
+    private void showRecordIndicator() {
         if (windowManager == null) return;
         
         try {
-            // Создаем оверлей для перехвата касаний
-            touchOverlay = new FrameLayout(this) {
-                @Override
-                public boolean onTouchEvent(MotionEvent event) {
-                    // Перехватываем и записываем клик
-                    if (isRecording && event.getAction() == MotionEvent.ACTION_DOWN) {
-                        int x = (int) event.getRawX();
-                        int y = (int) event.getRawY();
-                        
-                        long currentTime = System.currentTimeMillis();
-                        long delay = currentTime - lastActionTime;
-                        lastActionTime = currentTime;
-                        
-                        if (recordingListener != null) {
-                            mainHandler.post(() -> {
-                                if (recordingListener != null) {
-                                    recordingListener.onActionRecorded(x, y, delay);
-                                }
-                            });
-                        }
-                        
-                        // Создаем и отправляем событие клика в игру
-                        // Используем dispatchGesture для отправки клика
-                        try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                Path clickPath = new Path();
-                                clickPath.moveTo(x, y);
-                                GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-                                gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
-                                dispatchGesture(gestureBuilder.build(), null, null);
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    // Возвращаем true, чтобы событие было обработано, но мы уже отправили свое
-                    return true;
-                }
-            };
+            // Создаем контейнер для индикатора
+            FrameLayout container = new FrameLayout(this);
+            container.setBackgroundColor(0x00000000);
             
-            // Делаем оверлей видимым, но прозрачным
-            touchOverlay.setBackgroundColor(0x01000000); // Почти прозрачный, но перехватывает касания
-            
-            int flag = getOverlayFlag();
-            
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    flag,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-            );
-            params.gravity = Gravity.TOP | Gravity.START;
-            params.x = 0;
-            params.y = 0;
-            
-            windowManager.addView(touchOverlay, params);
-            
-            // Добавляем индикатор записи
-            addRecordIndicator();
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void addRecordIndicator() {
-        try {
             // Индикатор записи
             recordIndicator = new TextView(this);
             recordIndicator.setText("🔴 ЗАПИСЬ");
@@ -230,24 +158,14 @@ public class MacroService extends AccessibilityService {
             bg.setStroke(2, 0xFFFF0000);
             recordIndicator.setBackground(bg);
             
-            int flag = getOverlayFlag();
+            FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            textParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            textParams.setMargins(0, 30, 0, 0);
+            recordIndicator.setLayoutParams(textParams);
             
-            WindowManager.LayoutParams indicatorParams = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    flag,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-            );
-            indicatorParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            indicatorParams.x = 0;
-            indicatorParams.y = 30;
-            
-            windowManager.addView(recordIndicator, indicatorParams);
-            
-            // Анимация мигания
-            startBlinking(recordIndicator);
+            container.addView(recordIndicator);
             
             // Кнопка СТОП
             stopButton = new Button(this);
@@ -262,6 +180,13 @@ public class MacroService extends AccessibilityService {
             stopButton.setBackground(stopBg);
             stopButton.setPadding(24, 10, 24, 10);
             
+            FrameLayout.LayoutParams stopParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            stopParams.gravity = Gravity.TOP | Gravity.END;
+            stopParams.setMargins(0, 30, 30, 0);
+            stopButton.setLayoutParams(stopParams);
+            
             stopButton.setOnClickListener(v -> {
                 if (recordingListener != null) {
                     recordingListener.onRecordingStopped();
@@ -269,39 +194,47 @@ public class MacroService extends AccessibilityService {
                 stopRecording();
             });
             
-            WindowManager.LayoutParams stopParams = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.WRAP_CONTENT,
+            container.addView(stopButton);
+            
+            int flag = getOverlayFlag();
+            
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
                     flag,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // КЛЮЧЕВОЙ ФЛАГ!
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
-            stopParams.gravity = Gravity.TOP | Gravity.END;
-            stopParams.x = 0;
-            stopParams.y = 30;
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 0;
+            params.y = 0;
             
-            windowManager.addView(stopButton, stopParams);
+            windowManager.addView(container, params);
+            
+            // Сохраняем контейнер для удаления
+            final FrameLayout finalContainer = container;
+            
+            // Анимация мигания
+            startBlinking(recordIndicator);
             
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void hideTouchOverlay() {
+    private void hideRecordIndicator() {
         try {
-            if (touchOverlay != null && windowManager != null) {
-                windowManager.removeView(touchOverlay);
-                touchOverlay = null;
+            // Удаляем все окна
+            if (recordIndicator != null && recordIndicator.getParent() != null) {
+                View parent = (View) recordIndicator.getParent();
+                if (parent != null && windowManager != null) {
+                    windowManager.removeView(parent);
+                }
             }
-            if (recordIndicator != null && windowManager != null) {
-                windowManager.removeView(recordIndicator);
-                recordIndicator = null;
-            }
-            if (stopButton != null && windowManager != null) {
-                windowManager.removeView(stopButton);
-                stopButton = null;
-            }
+            recordIndicator = null;
+            stopButton = null;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -328,4 +261,4 @@ public class MacroService extends AccessibilityService {
             }
         }).start();
     }
-                }
+}
