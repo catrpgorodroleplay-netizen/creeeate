@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -36,7 +37,18 @@ public class MacroService extends AccessibilityService {
     }
 
     @Override
-    public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {}
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Перехватываем клики через AccessibilityService
+        if (isRecording && event != null) {
+            // Получаем координаты клика из события
+            if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                event.getEventType() == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
+                
+                // Пробуем получить координаты из события
+                // Это не всегда работает, используем альтернативный метод
+            }
+        }
+    }
 
     @Override
     public void onInterrupt() {}
@@ -112,16 +124,33 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== ТАЧ-ОВЕРЛЕЙ (ПРОПУСКАЕТ КЛИКИ) ====================
+    // ==================== МЕТОД ДЛЯ ЗАПИСИ КЛИКА ИЗ ВНЕ ====================
+
+    public void recordClickFromActivity(int x, int y) {
+        if (!isRecording || recordingListener == null) return;
+        
+        long currentTime = System.currentTimeMillis();
+        long delay = currentTime - lastActionTime;
+        lastActionTime = currentTime;
+        
+        mainHandler.post(() -> {
+            if (recordingListener != null) {
+                recordingListener.onActionRecorded(x, y, delay);
+            }
+        });
+    }
+
+    // ==================== ТАЧ-ОВЕРЛЕЙ (перехватывает и пропускает клики) ====================
 
     private void showTouchOverlay() {
         if (windowManager == null) return;
         
         try {
-            // Создаем оверлей
+            // Создаем оверлей для перехвата касаний
             touchOverlay = new FrameLayout(this) {
                 @Override
                 public boolean onTouchEvent(MotionEvent event) {
+                    // Перехватываем и записываем клик
                     if (isRecording && event.getAction() == MotionEvent.ACTION_DOWN) {
                         int x = (int) event.getRawX();
                         int y = (int) event.getRawY();
@@ -137,12 +166,28 @@ public class MacroService extends AccessibilityService {
                                 }
                             });
                         }
+                        
+                        // Создаем и отправляем событие клика в игру
+                        // Используем dispatchGesture для отправки клика
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                Path clickPath = new Path();
+                                clickPath.moveTo(x, y);
+                                GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
+                                gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
+                                dispatchGesture(gestureBuilder.build(), null, null);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
-                    return false;
+                    // Возвращаем true, чтобы событие было обработано, но мы уже отправили свое
+                    return true;
                 }
             };
             
-            touchOverlay.setBackgroundColor(0x00000000);
+            // Делаем оверлей видимым, но прозрачным
+            touchOverlay.setBackgroundColor(0x01000000); // Почти прозрачный, но перехватывает касания
             
             int flag = getOverlayFlag();
             
@@ -151,8 +196,6 @@ public class MacroService extends AccessibilityService {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     flag,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH |
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
@@ -285,4 +328,4 @@ public class MacroService extends AccessibilityService {
             }
         }).start();
     }
-}
+                }
