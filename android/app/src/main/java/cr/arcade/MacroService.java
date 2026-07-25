@@ -103,6 +103,8 @@ public class MacroService extends AccessibilityService {
         }
     }
 
+    // ==================== ЗАПИСЬ КЛИКА ИЗ ACTIVITY ====================
+    
     public void recordClick(int x, int y) {
         if (!isRecording || recordingListener == null) return;
         
