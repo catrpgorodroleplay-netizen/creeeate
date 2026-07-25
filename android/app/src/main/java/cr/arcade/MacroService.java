@@ -17,7 +17,6 @@ public class MacroService extends AccessibilityService {
     private RecordingListener listener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
-    private Handler handler = new Handler(Looper.getMainLooper());
     
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -70,30 +69,24 @@ public class MacroService extends AccessibilityService {
             long delay = currentTime - lastActionTime;
             lastActionTime = currentTime;
             listener.onActionRecorded(x, y, delay);
-            Log.d("MacroService", "📝 Записан клик: (" + x + ", " + y + ") задержка: " + delay + "ms");
+            Log.d("MacroService", "📝 Записан клик: (" + x + ", " + y + ")");
         }
     }
     
-    // ==========================================
-    // ВЫПОЛНЕНИЕ КЛИКА - БЫСТРО И ТОЧНО!
-    // ==========================================
     @RequiresApi(api = Build.VERSION_CODES.N)
     public void performClick(int x, int y) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            Log.e("MacroService", "❌ API 24+ требуется для кликов");
+            Log.e("MacroService", "❌ API 24+ требуется");
             return;
         }
         
         try {
-            // Создаем путь для клика
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
             
-            // Создаем жест
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
             
-            // Выполняем жест
             boolean result = dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
@@ -109,37 +102,11 @@ public class MacroService extends AccessibilityService {
             }, null);
             
             if (!result) {
-                Log.e("MacroService", "❌ Не удалось выполнить клик: (" + x + ", " + y + ")");
+                Log.e("MacroService", "❌ Не удалось выполнить клик");
             }
             
         } catch (Exception e) {
-            Log.e("MacroService", "❌ Ошибка клика: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    // ==========================================
-    // ВЫПОЛНЕНИЕ СВИПА
-    // ==========================================
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void performSwipe(int x1, int y1, int x2, int y2, long duration) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            return;
-        }
-        
-        try {
-            Path swipePath = new Path();
-            swipePath.moveTo(x1, y1);
-            swipePath.lineTo(x2, y2);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
-            Log.d("MacroService", "✅ Свип выполнен");
-            
-        } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("MacroService", "❌ Ошибка: " + e.getMessage());
         }
     }
     
