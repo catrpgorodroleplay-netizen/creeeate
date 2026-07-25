@@ -2,23 +2,17 @@ package com.cr.arcade;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
-import android.content.Intent;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.annotation.RequiresApi;
 
 public class MacroService extends AccessibilityService {
     private static MacroService instance;
@@ -30,11 +24,9 @@ public class MacroService extends AccessibilityService {
     private boolean isRecording = false;
     private long lastActionTime = 0;
     
-    // ИНДИКАТОР ЗАПИСИ
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
     
-    // Для записи через touch-перехват (альтернативный метод)
     private FrameLayout touchInterceptor;
     private boolean isTouchInterceptorShown = false;
 
@@ -45,14 +37,12 @@ public class MacroService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {
-        // МЕТОД 1: ЗАПИСЬ ЧЕРЕЗ СИСТЕМНЫЕ СОБЫТИЯ
         if (isRecording && recordingListener != null) {
             int eventType = event.getEventType();
             
+            // Используем ТОЛЬКО доступные константы
             if (eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_CLICKED ||
-                eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
-                eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_TOUCH_EXPLORATION_GESTURE_END ||
-                eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+                eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
                 
                 android.view.accessibility.AccessibilityNodeInfo source = event.getSource();
                 if (source != null) {
@@ -65,7 +55,7 @@ public class MacroService extends AccessibilityService {
                     if (x > 0 && y > 0) {
                         long currentTime = System.currentTimeMillis();
                         long delay = currentTime - lastActionTime;
-                        if (delay < 50) delay = 50; // Минимальная задержка
+                        if (delay < 50) delay = 50;
                         lastActionTime = currentTime;
                         
                         recordingListener.onActionRecorded(x, y, delay);
@@ -97,9 +87,7 @@ public class MacroService extends AccessibilityService {
         return instance;
     }
 
-    // ==================== УНИВЕРСАЛЬНЫЙ КЛИК ====================
-    
-    @RequiresApi(api = Build.VERSION_CODES.N)
+    // ===== ВЫПОЛНЕНИЕ КЛИКА =====
     public void performClick(int x, int y) {
         try {
             Path clickPath = new Path();
@@ -108,27 +96,16 @@ public class MacroService extends AccessibilityService {
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
             
-            dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
-                @Override
-                public void onCompleted(GestureDescription gestureDescription) {
-                    // Клик выполнен
-                }
-                
-                @Override
-                public void onCancelled(GestureDescription gestureDescription) {
-                    // Если клик отменен - пробуем альтернативный метод
-                    performAlternativeClick(x, y);
-                }
-            }, null);
+            dispatchGesture(gestureBuilder.build(), null, null);
         } catch (Exception e) {
+            e.printStackTrace();
+            // Альтернативный метод
             performAlternativeClick(x, y);
         }
     }
 
-    // ===== АЛЬТЕРНАТИВНЫЙ МЕТОД КЛИКА =====
     private void performAlternativeClick(int x, int y) {
         try {
-            // Используем другой паттерн для клика
             Path clickPath = new Path();
             clickPath.moveTo(x - 5, y - 5);
             clickPath.lineTo(x + 5, y + 5);
@@ -142,8 +119,6 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== ДОЛГИЙ КЛИК =====
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public void performLongClick(int x, int y) {
         try {
             Path clickPath = new Path();
@@ -158,8 +133,6 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== СВАЙП =====
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public void performSwipe(int x1, int y1, int x2, int y2, long duration) {
         try {
             Path swipePath = new Path();
@@ -175,8 +148,6 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== ДВОЙНОЙ КЛИК =====
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public void performDoubleClick(int x, int y) {
         performClick(x, y);
         clickHandler.postDelayed(() -> performClick(x, y), 100);
@@ -191,13 +162,10 @@ public class MacroService extends AccessibilityService {
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
         
-        // Показываем индикатор
         showIndicatorOverlay();
-        
-        // Включаем перехват касаний (для приложений, где не работают Accessibility события)
         showTouchInterceptor();
         
-        Toast.makeText(this, "🔴 Запись начата", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔴 Запись начата!", Toast.LENGTH_SHORT).show();
     }
 
     public void stopRecording() {
@@ -237,7 +205,7 @@ public class MacroService extends AccessibilityService {
             indicatorOverlay.setFocusable(false);
             
             // Текст "ЗАПИСЬ"
-            TextView recordText = new TextView(this);
+            android.widget.TextView recordText = new android.widget.TextView(this);
             recordText.setText("🔴 ЗАПИСЬ");
             recordText.setTextColor(0xFFFF0000);
             recordText.setTextSize(20);
@@ -260,7 +228,7 @@ public class MacroService extends AccessibilityService {
             indicatorOverlay.addView(recordText);
             
             // Кнопка СТОП
-            Button stopBtn = new Button(this);
+            android.widget.Button stopBtn = new android.widget.Button(this);
             stopBtn.setText("⏹ СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
             stopBtn.setTextSize(16);
@@ -286,7 +254,6 @@ public class MacroService extends AccessibilityService {
             });
             indicatorOverlay.addView(stopBtn);
             
-            // КЛЮЧЕВОЙ ФЛАГ: НЕ БЛОКИРУЕМ КЛИКИ
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -318,7 +285,7 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== ПЕРЕХВАТ КАСАНИЙ (альтернативная запись) ====================
+    // ==================== ПЕРЕХВАТ КАСАНИЙ ====================
 
     private void showTouchInterceptor() {
         if (windowManager == null || isTouchInterceptorShown) return;
@@ -339,14 +306,13 @@ public class MacroService extends AccessibilityService {
                             
                             recordingListener.onActionRecorded(x, y, delay);
                             
-                            // ВИБРАЦИЯ для обратной связи
+                            // Вибрация для обратной связи
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 vibrate(20);
                             }
                         }
                     }
-                    // ВОЗВРАЩАЕМ false - клик проходит дальше!
-                    return false;
+                    return false; // КЛИК ПРОХОДИТ!
                 }
             };
             
@@ -404,4 +370,4 @@ public class MacroService extends AccessibilityService {
             }
         }
     }
-}
+            }
