@@ -8,10 +8,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
-import android.view.MotionEvent;
-import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Button;
 import android.widget.Toast;
 
 public class MacroService extends AccessibilityService {
@@ -24,11 +24,9 @@ public class MacroService extends AccessibilityService {
     private boolean isRecording = false;
     private long lastActionTime = 0;
     
+    // ТОЛЬКО ИНДИКАТОР (НЕ ПЕРЕХВАТЫВАЕТ КЛИКИ)
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
-    
-    private FrameLayout touchInterceptor;
-    private boolean isTouchInterceptorShown = false;
 
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -37,10 +35,11 @@ public class MacroService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {
+        // ===== ЕДИНСТВЕННЫЙ МЕТОД ЗАПИСИ =====
         if (isRecording && recordingListener != null) {
             int eventType = event.getEventType();
             
-            // Используем ТОЛЬКО доступные константы
+            // Ловим клики
             if (eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_CLICKED ||
                 eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
                 
@@ -58,6 +57,7 @@ public class MacroService extends AccessibilityService {
                         if (delay < 50) delay = 50;
                         lastActionTime = currentTime;
                         
+                        // Записываем действие
                         recordingListener.onActionRecorded(x, y, delay);
                     }
                 }
@@ -79,7 +79,6 @@ public class MacroService extends AccessibilityService {
     public void onDestroy() {
         super.onDestroy();
         hideIndicatorOverlay();
-        hideTouchInterceptor();
         instance = null;
     }
 
@@ -96,22 +95,33 @@ public class MacroService extends AccessibilityService {
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
             
-            dispatchGesture(gestureBuilder.build(), null, null);
+            dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    // Клик выполнен успешно
+                }
+                
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    // Пробуем альтернативный метод
+                    performAlternativeClick(x, y);
+                }
+            }, null);
         } catch (Exception e) {
             e.printStackTrace();
-            // Альтернативный метод
             performAlternativeClick(x, y);
         }
     }
 
     private void performAlternativeClick(int x, int y) {
         try {
+            // Альтернативный паттерн клика
             Path clickPath = new Path();
-            clickPath.moveTo(x - 5, y - 5);
-            clickPath.lineTo(x + 5, y + 5);
+            clickPath.moveTo(x - 3, y - 3);
+            clickPath.lineTo(x + 3, y + 3);
             
             GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 100));
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 80));
             
             dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
@@ -150,7 +160,7 @@ public class MacroService extends AccessibilityService {
 
     public void performDoubleClick(int x, int y) {
         performClick(x, y);
-        clickHandler.postDelayed(() -> performClick(x, y), 100);
+        clickHandler.postDelayed(() -> performClick(x, y), 120);
     }
 
     // ==================== ЗАПИСЬ МАКРОСОВ ====================
@@ -162,10 +172,10 @@ public class MacroService extends AccessibilityService {
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
         
+        // ТОЛЬКО ИНДИКАТОР (без перехвата)
         showIndicatorOverlay();
-        showTouchInterceptor();
         
-        Toast.makeText(this, "🔴 Запись начата!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔴 Запись начата! Кликайте в любом приложении", Toast.LENGTH_SHORT).show();
     }
 
     public void stopRecording() {
@@ -173,7 +183,6 @@ public class MacroService extends AccessibilityService {
         
         this.isRecording = false;
         hideIndicatorOverlay();
-        hideTouchInterceptor();
         
         if (recordingListener != null) {
             recordingListener.onRecordingStopped();
@@ -193,7 +202,7 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== ИНДИКАТОР ЗАПИСИ ====================
+    // ==================== ИНДИКАТОР ЗАПИСИ (НЕ БЛОКИРУЕТ) ====================
 
     private void showIndicatorOverlay() {
         if (windowManager == null || isIndicatorShown) return;
@@ -201,50 +210,52 @@ public class MacroService extends AccessibilityService {
         try {
             indicatorOverlay = new FrameLayout(this);
             indicatorOverlay.setBackgroundColor(0x00000000);
-            indicatorOverlay.setClickable(false);
-            indicatorOverlay.setFocusable(false);
+            
+            // Контейнер для индикатора
+            FrameLayout indicatorContainer = new FrameLayout(this);
+            indicatorContainer.setBackgroundColor(0x00000000);
             
             // Текст "ЗАПИСЬ"
-            android.widget.TextView recordText = new android.widget.TextView(this);
+            TextView recordText = new TextView(this);
             recordText.setText("🔴 ЗАПИСЬ");
             recordText.setTextColor(0xFFFF0000);
-            recordText.setTextSize(20);
+            recordText.setTextSize(18);
             recordText.setTypeface(null, android.graphics.Typeface.BOLD);
             recordText.setGravity(Gravity.CENTER);
-            recordText.setPadding(24, 12, 24, 12);
+            recordText.setPadding(20, 10, 20, 10);
             
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(20);
+            bg.setCornerRadius(16);
             bg.setColor(0xCC000000);
-            bg.setStroke(3, 0xFFFF0000);
+            bg.setStroke(2, 0xFFFF0000);
             recordText.setBackground(bg);
             
             FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT);
             textParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            textParams.setMargins(0, 40, 0, 0);
+            textParams.setMargins(0, 30, 0, 0);
             recordText.setLayoutParams(textParams);
-            indicatorOverlay.addView(recordText);
+            indicatorContainer.addView(recordText);
             
             // Кнопка СТОП
-            android.widget.Button stopBtn = new android.widget.Button(this);
+            Button stopBtn = new Button(this);
             stopBtn.setText("⏹ СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
-            stopBtn.setTextSize(16);
+            stopBtn.setTextSize(14);
             stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
             
             android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
-            stopBg.setCornerRadius(24);
+            stopBg.setCornerRadius(20);
             stopBg.setColor(0xFFFF0000);
             stopBtn.setBackground(stopBg);
-            stopBtn.setPadding(28, 12, 28, 12);
+            stopBtn.setPadding(24, 10, 24, 10);
             
             FrameLayout.LayoutParams stopParams = new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT);
             stopParams.gravity = Gravity.TOP | Gravity.END;
-            stopParams.setMargins(0, 40, 40, 0);
+            stopParams.setMargins(0, 30, 30, 0);
             stopBtn.setLayoutParams(stopParams);
             
             stopBtn.setOnClickListener(v -> {
@@ -252,18 +263,23 @@ public class MacroService extends AccessibilityService {
                     stopRecording();
                 }
             });
-            indicatorOverlay.addView(stopBtn);
+            indicatorContainer.addView(stopBtn);
             
+            indicatorOverlay.addView(indicatorContainer);
+            
+            // КЛЮЧЕВЫЕ ФЛАГИ: НЕ БЛОКИРУЕМ КЛИКИ!
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
                     getOverlayFlag(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // ГЛАВНЫЙ ФЛАГ!
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
             params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 0;
+            params.y = 0;
             
             windowManager.addView(indicatorOverlay, params);
             isIndicatorShown = true;
@@ -285,70 +301,6 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== ПЕРЕХВАТ КАСАНИЙ ====================
-
-    private void showTouchInterceptor() {
-        if (windowManager == null || isTouchInterceptorShown) return;
-        
-        try {
-            touchInterceptor = new FrameLayout(this) {
-                @Override
-                public boolean onTouchEvent(MotionEvent event) {
-                    if (isRecording && recordingListener != null) {
-                        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                            int x = (int) event.getRawX();
-                            int y = (int) event.getRawY();
-                            
-                            long currentTime = System.currentTimeMillis();
-                            long delay = currentTime - lastActionTime;
-                            if (delay < 50) delay = 50;
-                            lastActionTime = currentTime;
-                            
-                            recordingListener.onActionRecorded(x, y, delay);
-                            
-                            // Вибрация для обратной связи
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                vibrate(20);
-                            }
-                        }
-                    }
-                    return false; // КЛИК ПРОХОДИТ!
-                }
-            };
-            
-            touchInterceptor.setBackgroundColor(0x00000000);
-            
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    getOverlayFlag(),
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-            );
-            params.gravity = Gravity.TOP | Gravity.START;
-            
-            windowManager.addView(touchInterceptor, params);
-            isTouchInterceptorShown = true;
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void hideTouchInterceptor() {
-        try {
-            if (touchInterceptor != null && windowManager != null && isTouchInterceptorShown) {
-                windowManager.removeView(touchInterceptor);
-                touchInterceptor = null;
-                isTouchInterceptorShown = false;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
     private int getOverlayFlag() {
@@ -356,18 +308,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-
-    private void vibrate(long ms) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                android.os.VibrationEffect effect = android.os.VibrationEffect.createOneShot(ms, 50);
-                android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
-                if (vibrator != null) {
-                    vibrator.vibrate(effect);
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-            }
