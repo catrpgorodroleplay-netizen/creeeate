@@ -27,7 +27,7 @@ public class MacroService extends AccessibilityService {
     private long lastActionTime = 0;
     private int actionCount = 0;
     
-    // ТОЛЬКО ИНДИКАТОР (НЕ БЛОКИРУЕТ КЛИКИ!)
+    // ТОЛЬКО ИНДИКАТОР (НЕ БЛОКИРУЕТ!)
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
 
@@ -38,12 +38,17 @@ public class MacroService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // ===== ЗАПИСЬ КЛИКОВ ЧЕРЕЗ СИСТЕМНЫЕ СОБЫТИЯ =====
         if (isRecording && recordingListener != null) {
             int eventType = event.getEventType();
             
-            // Ловим ТОЛЬКО клики
-            if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            // Ловим ВСЕ типы событий
+            if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
+                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
+                eventType == AccessibilityEvent.TYPE_VIEW_SELECTED) {
+                
                 AccessibilityNodeInfo source = event.getSource();
                 if (source != null) {
                     Rect rect = new Rect();
@@ -59,7 +64,6 @@ public class MacroService extends AccessibilityService {
                         lastActionTime = currentTime;
                         actionCount++;
                         
-                        // Отправляем в UI
                         recordingListener.onActionRecorded(x, y, delay);
                     }
                 }
@@ -103,7 +107,34 @@ public class MacroService extends AccessibilityService {
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
             
-            dispatchGesture(gestureBuilder.build(), null, null);
+            dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    // Клик выполнен
+                }
+                
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    // Пробуем альтернативный метод
+                    performAlternativeClick(x, y);
+                }
+            }, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+            performAlternativeClick(x, y);
+        }
+    }
+
+    private void performAlternativeClick(int x, int y) {
+        try {
+            Path clickPath = new Path();
+            clickPath.moveTo(x - 5, y - 5);
+            clickPath.lineTo(x + 5, y + 5);
+            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 80));
+            
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -118,10 +149,9 @@ public class MacroService extends AccessibilityService {
         this.lastActionTime = System.currentTimeMillis();
         this.actionCount = 0;
         
-        // Показываем ТОЛЬКО индикатор
         showIndicatorOverlay();
         
-        Toast.makeText(this, "🔴 Запись начата!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔴 Запись начата! Кликайте в любом приложении", Toast.LENGTH_SHORT).show();
     }
 
     public void stopRecording() {
@@ -148,17 +178,14 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== ИНДИКАТОР (НЕ БЛОКИРУЕТ КЛИКИ!) =====
+    // ===== ИНДИКАТОР (НЕ БЛОКИРУЕТ!) =====
     private void showIndicatorOverlay() {
         if (windowManager == null || isIndicatorShown) return;
         
         try {
             indicatorOverlay = new FrameLayout(this);
-            
-            // ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ ФОН
             indicatorOverlay.setBackgroundColor(0x00000000);
             
-            // Контейнер для индикатора
             FrameLayout container = new FrameLayout(this);
             container.setBackgroundColor(0x00000000);
             
@@ -214,7 +241,7 @@ public class MacroService extends AccessibilityService {
             
             indicatorOverlay.addView(container);
             
-            // ===== КЛЮЧЕВОЙ МОМЕНТ: НЕ БЛОКИРУЕМ КЛИКИ =====
+            // КЛЮЧЕВОЙ ФЛАГ: НЕ БЛОКИРУЕМ КЛИКИ
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -254,4 +281,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-                }
+            }
