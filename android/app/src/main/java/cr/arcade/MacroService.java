@@ -2,7 +2,6 @@ package com.cr.arcade;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
-import android.content.Intent;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.os.Build;
@@ -29,6 +28,7 @@ public class MacroService extends AccessibilityService {
     private long lastActionTime = 0;
     private FrameLayout touchOverlay;
     private TextView recordIndicator;
+    private Button stopButton;
 
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -122,7 +122,6 @@ public class MacroService extends AccessibilityService {
             touchOverlay = new FrameLayout(this) {
                 @Override
                 public boolean onTouchEvent(MotionEvent event) {
-                    // Записываем клик
                     if (isRecording && event.getAction() == MotionEvent.ACTION_DOWN) {
                         int x = (int) event.getRawX();
                         int y = (int) event.getRawY();
@@ -139,15 +138,12 @@ public class MacroService extends AccessibilityService {
                             });
                         }
                     }
-                    // ВОЗВРАЩАЕМ false - событие идет дальше!
                     return false;
                 }
             };
             
-            // АБСОЛЮТНО ПРОЗРАЧНЫЙ - не перехватывает клики
             touchOverlay.setBackgroundColor(0x00000000);
             
-            // Флаг FLAG_NOT_TOUCHABLE - клики проходят сквозь
             int flag = getOverlayFlag();
             
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -155,16 +151,18 @@ public class MacroService extends AccessibilityService {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     flag,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |  // КЛЮЧЕВОЙ ФЛАГ!
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH |
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
             params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 0;
+            params.y = 0;
             
             windowManager.addView(touchOverlay, params);
             
-            // Отдельно добавляем индикатор записи (он будет кликабельным)
+            // Добавляем индикатор записи
             addRecordIndicator();
             
         } catch (Exception e) {
@@ -189,12 +187,6 @@ public class MacroService extends AccessibilityService {
             bg.setStroke(2, 0xFFFF0000);
             recordIndicator.setBackground(bg);
             
-            // Индикатор кликабельный
-            recordIndicator.setOnClickListener(v -> {
-                // Ничего не делаем, просто чтобы был кликабельным
-            });
-            
-            // Параметры для индикатора (отдельное окно)
             int flag = getOverlayFlag();
             
             WindowManager.LayoutParams indicatorParams = new WindowManager.LayoutParams(
@@ -206,27 +198,28 @@ public class MacroService extends AccessibilityService {
                     PixelFormat.TRANSLUCENT
             );
             indicatorParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            indicatorParams.setMargins(0, 30, 0, 0);
+            indicatorParams.x = 0;
+            indicatorParams.y = 30;
             
             windowManager.addView(recordIndicator, indicatorParams);
             
             // Анимация мигания
             startBlinking(recordIndicator);
             
-            // Кнопка СТОП (отдельное окно)
-            Button stopBtn = new Button(this);
-            stopBtn.setText("⏹ СТОП");
-            stopBtn.setTextColor(0xFFFFFFFF);
-            stopBtn.setTextSize(14);
-            stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+            // Кнопка СТОП
+            stopButton = new Button(this);
+            stopButton.setText("⏹ СТОП");
+            stopButton.setTextColor(0xFFFFFFFF);
+            stopButton.setTextSize(14);
+            stopButton.setTypeface(null, android.graphics.Typeface.BOLD);
             
             android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
             stopBg.setCornerRadius(20);
             stopBg.setColor(0xFFFF0000);
-            stopBtn.setBackground(stopBg);
-            stopBtn.setPadding(24, 10, 24, 10);
+            stopButton.setBackground(stopBg);
+            stopButton.setPadding(24, 10, 24, 10);
             
-            stopBtn.setOnClickListener(v -> {
+            stopButton.setOnClickListener(v -> {
                 if (recordingListener != null) {
                     recordingListener.onRecordingStopped();
                 }
@@ -242,12 +235,10 @@ public class MacroService extends AccessibilityService {
                     PixelFormat.TRANSLUCENT
             );
             stopParams.gravity = Gravity.TOP | Gravity.END;
-            stopParams.setMargins(0, 30, 30, 0);
+            stopParams.x = 0;
+            stopParams.y = 30;
             
-            windowManager.addView(stopBtn, stopParams);
-            
-            // Сохраняем ссылку на кнопку для удаления
-            final Button stopButton = stopBtn;
+            windowManager.addView(stopButton, stopParams);
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -264,8 +255,10 @@ public class MacroService extends AccessibilityService {
                 windowManager.removeView(recordIndicator);
                 recordIndicator = null;
             }
-            // Удаляем все дополнительные вью
-            // (кнопка СТОП удаляется автоматически при остановке записи)
+            if (stopButton != null && windowManager != null) {
+                windowManager.removeView(stopButton);
+                stopButton = null;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -292,4 +285,4 @@ public class MacroService extends AccessibilityService {
             }
         }).start();
     }
-                }
+}
