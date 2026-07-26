@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -15,6 +17,7 @@ public class MacroService extends AccessibilityService {
     private RecordingListener listener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
+    private Handler handler = new Handler(Looper.getMainLooper());
     
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -27,12 +30,35 @@ public class MacroService extends AccessibilityService {
     
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Не нужен для макросов
+        // Отслеживаем клики
+        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+            event.getEventType() == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
+            event.getEventType() == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START) {
+            
+            if (isRecording && listener != null) {
+                // Получаем координаты клика
+                int x = event.getWindowId();
+                // Альтернативный способ - через getSource
+                if (event.getSource() != null) {
+                    int[] location = new int[2];
+                    event.getSource().getLocationOnScreen(location);
+                    int clickX = location[0];
+                    int clickY = location[1];
+                    
+                    long currentTime = System.currentTimeMillis();
+                    long delay = currentTime - lastActionTime;
+                    lastActionTime = currentTime;
+                    
+                    Log.d("MacroService", "📝 Клик обнаружен: (" + clickX + ", " + clickY + ")");
+                    listener.onActionRecorded(clickX, clickY, delay);
+                }
+            }
+        }
     }
     
     @Override
     public void onInterrupt() {
-        // Не нужен
+        Log.d("MacroService", "Сервис прерван");
     }
     
     @Override
