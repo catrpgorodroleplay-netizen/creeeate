@@ -26,10 +26,14 @@ public class MacroService extends AccessibilityService {
     }
     
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {}
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Не нужен для макросов
+    }
     
     @Override
-    public void onInterrupt() {}
+    public void onInterrupt() {
+        // Не нужен
+    }
     
     @Override
     public void onServiceConnected() {
@@ -54,6 +58,7 @@ public class MacroService extends AccessibilityService {
     
     public void stopRecordingFromActivity() {
         this.isRecording = false;
+        Log.d("MacroService", "Запись остановлена из Activity");
     }
     
     public void recordClick(int x, int y) {
@@ -69,7 +74,7 @@ public class MacroService extends AccessibilityService {
     @RequiresApi(api = Build.VERSION_CODES.N)
     public void performClick(int x, int y) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            Log.e("MacroService", "❌ API 24+ требуется");
+            Log.e("MacroService", "❌ API 24+ требуется для кликов");
             return;
         }
         
@@ -80,20 +85,27 @@ public class MacroService extends AccessibilityService {
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 30));
             
-            dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
+            boolean result = dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
                     Log.d("MacroService", "✅ Клик выполнен: (" + x + ", " + y + ")");
                 }
                 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
                     Log.e("MacroService", "❌ Клик отменен: (" + x + ", " + y + ")");
                 }
             }, null);
             
+            if (!result) {
+                Log.e("MacroService", "❌ Не удалось выполнить клик");
+            }
+            
         } catch (Exception e) {
-            Log.e("MacroService", "❌ Ошибка: " + e.getMessage());
+            Log.e("MacroService", "❌ Ошибка клика: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
