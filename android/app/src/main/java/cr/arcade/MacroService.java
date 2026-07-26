@@ -36,8 +36,6 @@ public class MacroService extends AccessibilityService {
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
     
-    // ОЧЕРЕДЬ КЛИКОВ
-    private Runnable pendingClick = null;
     private boolean isProcessingClick = false;
 
     public interface RecordingListener {
@@ -77,8 +75,8 @@ public class MacroService extends AccessibilityService {
         return instance;
     }
 
-    // ===== ВЫПОЛНЕНИЕ КЛИКА =====
-    public void performClick(int x, int y) {
+    // ===== ВЫПОЛНЕНИЕ КЛИКА (ПЕРЕИМЕНОВАНО) =====
+    public void doClick(int x, int y) {
         try {
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
@@ -94,16 +92,16 @@ public class MacroService extends AccessibilityService {
                 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
-                    performAlternativeClick(x, y);
+                    doAlternativeClick(x, y);
                 }
             }, null);
         } catch (Exception e) {
             e.printStackTrace();
-            performAlternativeClick(x, y);
+            doAlternativeClick(x, y);
         }
     }
 
-    private void performAlternativeClick(int x, int y) {
+    private void doAlternativeClick(int x, int y) {
         try {
             Path clickPath = new Path();
             clickPath.moveTo(x - 5, y - 5);
@@ -193,7 +191,7 @@ public class MacroService extends AccessibilityService {
                             clickHandler.postDelayed(new Runnable() {
                                 @Override
                                 public void run() {
-                                    performClick(x, y);
+                                    doClick(x, y);
                                     
                                     // 3. Возвращаем оверлей через 100мс
                                     clickHandler.postDelayed(new Runnable() {
