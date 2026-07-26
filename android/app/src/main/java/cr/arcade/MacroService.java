@@ -8,10 +8,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
-import android.view.MotionEvent;
-import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.graphics.Rect;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Button;
@@ -21,39 +21,59 @@ public class MacroService extends AccessibilityService {
     private static MacroService instance;
     private WindowManager windowManager;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
-    private Handler clickHandler = new Handler();
     
     private RecordingListener recordingListener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
     private int actionCount = 0;
+    private long lastEventTime = 0;
     
-    // ОВЕРЛЕЙ
-    private FrameLayout clickOverlay;
-    private boolean isOverlayShown = false;
-    
-    // ИНДИКАТОР
+    // ТОЛЬКО ИНДИКАТОР (НЕ БЛОКИРУЕТ!)
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
-    
-    private boolean isProcessingClick = false;
-    
-    // ДЛЯ ОТСЛЕЖИВАНИЯ ЖЕСТОВ
-    private float touchStartX, touchStartY;
-    private float touchEndX, touchEndY;
-    private long touchStartTime;
-    private boolean isSwiping = false;
-    private static final int SWIPE_THRESHOLD = 30;
-    private static final int CLICK_MAX_TIME = 300;
 
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
-        void onSwipeRecorded(int x1, int y1, int x2, int y2, long delay);
         void onRecordingStopped();
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {}
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (!isRecording || recordingListener == null) return;
+        
+        int eventType = event.getEventType();
+        long currentTime = System.currentTimeMillis();
+        
+        // ===== ТОЛЬКО РЕАЛЬНЫЕ КЛИКИ =====
+        boolean isClick = false;
+        
+        if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
+            isClick = true;
+        }
+        
+        // ===== АНТИ-СПАМ =====
+        if (isClick && (currentTime - lastEventTime) > 50) {
+            AccessibilityNodeInfo source = event.getSource();
+            if (source != null) {
+                Rect rect = new Rect();
+                source.getBoundsInScreen(rect);
+                
+                int x = rect.centerX();
+                int y = rect.centerY();
+                
+                if (x > 0 && y > 0 && rect.width() > 0 && rect.height() > 0) {
+                    long delay = currentTime - lastActionTime;
+                    if (delay < 50) delay = 50;
+                    lastActionTime = currentTime;
+                    lastEventTime = currentTime;
+                    actionCount++;
+                    
+                    recordingListener.onActionRecorded(x, y, delay);
+                }
+            }
+        }
+    }
 
     @Override
     public void onInterrupt() {}
@@ -75,7 +95,6 @@ public class MacroService extends AccessibilityService {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        hideClickOverlay();
         hideIndicatorOverlay();
         instance = null;
     }
@@ -93,7 +112,33 @@ public class MacroService extends AccessibilityService {
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
             
-            dispatchGesture(gestureBuilder.build(), null, null);
+            dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    // Клик выполнен
+                }
+                
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    doAlternativeClick(x, y);
+                }
+            }, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+            doAlternativeClick(x, y);
+        }
+    }
+
+    private void doAlternativeClick(int x, int y) {
+        try {
+            Path clickPath = new Path();
+            clickPath.moveTo(x - 5, y - 5);
+            clickPath.lineTo(x + 5, y + 5);
+            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 80));
+            
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -122,19 +167,18 @@ public class MacroService extends AccessibilityService {
         this.recordingListener = listener;
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
+        this.lastEventTime = 0;
         this.actionCount = 0;
         
         showIndicatorOverlay();
-        showClickOverlay();
         
-        Toast.makeText(this, "🔴 Запись начата! Клики и свайпы записываются", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔴 Запись начата! Клики проходят сквозь!", Toast.LENGTH_SHORT).show();
     }
 
     public void stopRecording() {
         if (!isRecording) return;
         
         this.isRecording = false;
-        hideClickOverlay();
         hideIndicatorOverlay();
         
         if (recordingListener != null) {
@@ -155,178 +199,19 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== УМНЫЙ ОВЕРЛЕЙ (КЛИКИ + СВАЙПЫ) =====
-    private void showClickOverlay() {
-        if (windowManager == null || isOverlayShown) return;
-        
-        try {
-            clickOverlay = new FrameLayout(this) {
-                @Override
-                public boolean onTouchEvent(MotionEvent event) {
-                    if (!isRecording || isProcessingClick) return false;
-                    
-                    switch (event.getAction()) {
-                        case MotionEvent.ACTION_DOWN:
-                            touchStartX = event.getRawX();
-                            touchStartY = event.getRawY();
-                            touchEndX = touchStartX;
-                            touchEndY = touchStartY;
-                            touchStartTime = System.currentTimeMillis();
-                            isSwiping = false;
-                            return true;
-                            
-                        case MotionEvent.ACTION_MOVE:
-                            float dx = event.getRawX() - touchStartX;
-                            float dy = event.getRawY() - touchStartY;
-                            if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD) {
-                                isSwiping = true;
-                                touchEndX = event.getRawX();
-                                touchEndY = event.getRawY();
-                            }
-                            return true;
-                            
-                        case MotionEvent.ACTION_UP:
-                            long duration = System.currentTimeMillis() - touchStartTime;
-                            float dx2 = event.getRawX() - touchStartX;
-                            float dy2 = event.getRawY() - touchStartY;
-                            
-                            // Если свайп
-                            if (isSwiping || Math.abs(dx2) > SWIPE_THRESHOLD || Math.abs(dy2) > SWIPE_THRESHOLD) {
-                                // Записываем свайп
-                                final int x1 = (int) touchStartX;
-                                final int y1 = (int) touchStartY;
-                                final int x2 = (int) event.getRawX();
-                                final int y2 = (int) event.getRawY();
-                                final long swipeDuration = Math.max(duration, 100);
-                                
-                                long currentTime = System.currentTimeMillis();
-                                long delay = currentTime - lastActionTime;
-                                if (delay < 50) delay = 50;
-                                lastActionTime = currentTime;
-                                actionCount++;
-                                
-                                if (recordingListener != null) {
-                                    recordingListener.onSwipeRecorded(x1, y1, x2, y2, delay);
-                                }
-                                
-                                // Выполняем свайп (чтобы игра получила действие)
-                                isProcessingClick = true;
-                                hideClickOverlay();
-                                
-                                clickHandler.postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        doSwipe(x1, y1, x2, y2, swipeDuration);
-                                        
-                                        clickHandler.postDelayed(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                if (isRecording) {
-                                                    showClickOverlay();
-                                                }
-                                                isProcessingClick = false;
-                                            }
-                                        }, 150);
-                                    }
-                                }, 50);
-                                
-                                return true;
-                            }
-                            
-                            // Иначе это клик
-                            if (duration < CLICK_MAX_TIME) {
-                                final int x = (int) event.getRawX();
-                                final int y = (int) event.getRawY();
-                                
-                                long currentTime = System.currentTimeMillis();
-                                long delay = currentTime - lastActionTime;
-                                if (delay < 50) delay = 50;
-                                lastActionTime = currentTime;
-                                actionCount++;
-                                
-                                if (recordingListener != null) {
-                                    recordingListener.onActionRecorded(x, y, delay);
-                                }
-                                
-                                isProcessingClick = true;
-                                hideClickOverlay();
-                                
-                                clickHandler.postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        doClick(x, y);
-                                        
-                                        clickHandler.postDelayed(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                if (isRecording) {
-                                                    showClickOverlay();
-                                                }
-                                                isProcessingClick = false;
-                                            }
-                                        }, 100);
-                                    }
-                                }, 50);
-                                
-                                return true;
-                            }
-                            
-                            return false;
-                    }
-                    return false;
-                }
-            };
-            
-            clickOverlay.setBackgroundColor(0x00000000);
-            clickOverlay.setClickable(true);
-            clickOverlay.setFocusable(true);
-            
-            int flag = getOverlayFlag();
-            
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    flag,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-                    PixelFormat.TRANSLUCENT
-            );
-            params.gravity = Gravity.TOP | Gravity.START;
-            params.x = 0;
-            params.y = 0;
-            
-            windowManager.addView(clickOverlay, params);
-            isOverlayShown = true;
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void hideClickOverlay() {
-        try {
-            if (clickOverlay != null && windowManager != null && isOverlayShown) {
-                windowManager.removeView(clickOverlay);
-                clickOverlay = null;
-                isOverlayShown = false;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // ===== ИНДИКАТОР =====
+    // ===== ИНДИКАТОР (НЕ БЛОКИРУЕТ! КАК ПЕРСОНАЖ) =====
     private void showIndicatorOverlay() {
         if (windowManager == null || isIndicatorShown) return;
         
         try {
             indicatorOverlay = new FrameLayout(this);
-            indicatorOverlay.setBackgroundColor(0x00000000);
+            indicatorOverlay.setBackgroundColor(0x00000000); // ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ
             
+            // Контейнер для индикатора (тоже прозрачный)
             FrameLayout container = new FrameLayout(this);
             container.setBackgroundColor(0x00000000);
             
+            // Текст "ЗАПИСЬ"
             TextView recordText = new TextView(this);
             recordText.setText("🔴 ЗАПИСЬ");
             recordText.setTextColor(0xFFFF0000);
@@ -349,6 +234,7 @@ public class MacroService extends AccessibilityService {
             recordText.setLayoutParams(textParams);
             container.addView(recordText);
             
+            // Кнопка СТОП
             Button stopBtn = new Button(this);
             stopBtn.setText("⏹ СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
@@ -377,12 +263,17 @@ public class MacroService extends AccessibilityService {
             
             indicatorOverlay.addView(container);
             
+            // ===== КЛЮЧЕВОЙ МОМЕНТ: НЕ БЛОКИРУЕМ КЛИКИ (КАК ПЕРСОНАЖ) =====
+            indicatorOverlay.setClickable(false);
+            indicatorOverlay.setFocusable(false);
+            indicatorOverlay.setFocusableInTouchMode(false);
+            
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
                     getOverlayFlag(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // ← КЛИКИ ПРОХОДЯТ!
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
@@ -415,4 +306,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-                                }
+                                   }
