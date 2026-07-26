@@ -8,10 +8,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityNodeInfo;
-import android.graphics.Rect;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Button;
@@ -21,16 +21,24 @@ public class MacroService extends AccessibilityService {
     private static MacroService instance;
     private WindowManager windowManager;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Handler clickHandler = new Handler();
     
     private RecordingListener recordingListener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
     private int actionCount = 0;
-    private long lastEventTime = 0;
     
-    // ТОЛЬКО ИНДИКАТОР (НЕ БЛОКИРУЕТ!)
+    // ОВЕРЛЕЙ ДЛЯ ПЕРЕХВАТА КЛИКОВ
+    private FrameLayout clickOverlay;
+    private boolean isOverlayShown = false;
+    
+    // ИНДИКАТОР ЗАПИСИ
     private FrameLayout indicatorOverlay;
     private boolean isIndicatorShown = false;
+    
+    // ОЧЕРЕДЬ КЛИКОВ
+    private Runnable pendingClick = null;
+    private boolean isProcessingClick = false;
 
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -38,63 +46,7 @@ public class MacroService extends AccessibilityService {
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (!isRecording || recordingListener == null) return;
-        
-        int eventType = event.getEventType(); // ← ИСПРАВЛЕНО!
-        long currentTime = System.currentTimeMillis();
-        
-        // ===== ФИЛЬТР: ТОЛЬКО РЕАЛЬНЫЕ КЛИКИ =====
-        boolean isClick = false;
-        
-        // Основные типы кликов
-        if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
-            eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
-            isClick = true;
-        }
-        
-        // Дополнительно: проверяем что событие НЕ системное
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
-            eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-            eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
-            eventType == AccessibilityEvent.TYPE_VIEW_SELECTED) {
-            
-            // Проверяем, что это реальный клик, а не системное обновление
-            AccessibilityNodeInfo source = event.getSource();
-            if (source != null) {
-                // Если есть текст или описание - это UI элемент, а не игра
-                CharSequence text = source.getText();
-                CharSequence desc = source.getContentDescription();
-                if ((text != null && text.length() > 0) || (desc != null && desc.length() > 0)) {
-                    isClick = true;
-                }
-            }
-        }
-        
-        // ===== АНТИ-СПАМ: не записываем чаще чем 50мс =====
-        if (isClick && (currentTime - lastEventTime) > 50) {
-            AccessibilityNodeInfo source = event.getSource();
-            if (source != null) {
-                Rect rect = new Rect();
-                source.getBoundsInScreen(rect);
-                
-                int x = rect.centerX();
-                int y = rect.centerY();
-                
-                // Проверяем валидность координат
-                if (x > 0 && y > 0 && rect.width() > 0 && rect.height() > 0) {
-                    long delay = currentTime - lastActionTime;
-                    if (delay < 50) delay = 50;
-                    lastActionTime = currentTime;
-                    lastEventTime = currentTime;
-                    actionCount++;
-                    
-                    // Отправляем в UI
-                    recordingListener.onActionRecorded(x, y, delay);
-                }
-            }
-        }
-    }
+    public void onAccessibilityEvent(AccessibilityEvent event) {}
 
     @Override
     public void onInterrupt() {}
@@ -109,12 +61,14 @@ public class MacroService extends AccessibilityService {
     @Override
     public void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         Toast.makeText(this, "✅ Макрос сервис готов", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+        hideClickOverlay();
         hideIndicatorOverlay();
         instance = null;
     }
@@ -164,35 +118,6 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    public void performLongClick(int x, int y) {
-        try {
-            Path clickPath = new Path();
-            clickPath.moveTo(x, y);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 800));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void performSwipe(int x1, int y1, int x2, int y2, long duration) {
-        try {
-            Path swipePath = new Path();
-            swipePath.moveTo(x1, y1);
-            swipePath.lineTo(x2, y2);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     // ===== ЗАПИСЬ =====
     public void startRecording(RecordingListener listener) {
         if (isRecording) return;
@@ -200,10 +125,10 @@ public class MacroService extends AccessibilityService {
         this.recordingListener = listener;
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
-        this.lastEventTime = 0;
         this.actionCount = 0;
         
         showIndicatorOverlay();
+        showClickOverlay();
         
         Toast.makeText(this, "🔴 Запись начата! Кликайте в любом приложении", Toast.LENGTH_SHORT).show();
     }
@@ -212,6 +137,7 @@ public class MacroService extends AccessibilityService {
         if (!isRecording) return;
         
         this.isRecording = false;
+        hideClickOverlay();
         hideIndicatorOverlay();
         
         if (recordingListener != null) {
@@ -232,7 +158,104 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ===== ИНДИКАТОР (НЕ БЛОКИРУЕТ!) =====
+    // ===== ОВЕРЛЕЙ ДЛЯ ПЕРЕХВАТА КЛИКОВ =====
+    private void showClickOverlay() {
+        if (windowManager == null || isOverlayShown) return;
+        
+        try {
+            clickOverlay = new FrameLayout(this) {
+                @Override
+                public boolean onTouchEvent(MotionEvent event) {
+                    if (isRecording && !isProcessingClick) {
+                        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                            final int x = (int) event.getRawX();
+                            final int y = (int) event.getRawY();
+                            
+                            // Запоминаем клик
+                            long currentTime = System.currentTimeMillis();
+                            long delay = currentTime - lastActionTime;
+                            if (delay < 50) delay = 50;
+                            lastActionTime = currentTime;
+                            actionCount++;
+                            
+                            // Записываем действие
+                            if (recordingListener != null) {
+                                recordingListener.onActionRecorded(x, y, delay);
+                            }
+                            
+                            // ==== МАГИЯ: ОВЕРЛЕЙ ИСЧЕЗАЕТ, КЛИК ПРОХОДИТ, ОВЕРЛЕЙ ВОЗВРАЩАЕТСЯ ====
+                            isProcessingClick = true;
+                            
+                            // 1. Убираем оверлей
+                            hideClickOverlay();
+                            
+                            // 2. Выполняем клик в то же место
+                            clickHandler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    performClick(x, y);
+                                    
+                                    // 3. Возвращаем оверлей через 100мс
+                                    clickHandler.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if (isRecording) {
+                                                showClickOverlay();
+                                            }
+                                            isProcessingClick = false;
+                                        }
+                                    }, 100);
+                                }
+                            }, 50);
+                            
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            };
+            
+            // ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ, НО ПЕРЕХВАТЫВАЕТ КЛИКИ
+            clickOverlay.setBackgroundColor(0x00000000);
+            clickOverlay.setClickable(true);
+            clickOverlay.setFocusable(true);
+            
+            int flag = getOverlayFlag();
+            
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    flag,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                    PixelFormat.TRANSLUCENT
+            );
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 0;
+            params.y = 0;
+            
+            windowManager.addView(clickOverlay, params);
+            isOverlayShown = true;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void hideClickOverlay() {
+        try {
+            if (clickOverlay != null && windowManager != null && isOverlayShown) {
+                windowManager.removeView(clickOverlay);
+                clickOverlay = null;
+                isOverlayShown = false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ===== ИНДИКАТОР ЗАПИСИ =====
     private void showIndicatorOverlay() {
         if (windowManager == null || isIndicatorShown) return;
         
@@ -243,7 +266,6 @@ public class MacroService extends AccessibilityService {
             FrameLayout container = new FrameLayout(this);
             container.setBackgroundColor(0x00000000);
             
-            // Текст "ЗАПИСЬ"
             TextView recordText = new TextView(this);
             recordText.setText("🔴 ЗАПИСЬ");
             recordText.setTextColor(0xFFFF0000);
@@ -266,7 +288,6 @@ public class MacroService extends AccessibilityService {
             recordText.setLayoutParams(textParams);
             container.addView(recordText);
             
-            // Кнопка СТОП
             Button stopBtn = new Button(this);
             stopBtn.setText("⏹ СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
@@ -295,7 +316,6 @@ public class MacroService extends AccessibilityService {
             
             indicatorOverlay.addView(container);
             
-            // КЛЮЧЕВОЙ ФЛАГ: НЕ БЛОКИРУЕМ КЛИКИ
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -335,4 +355,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-    }
+}
