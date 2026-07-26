@@ -14,7 +14,6 @@ import android.hardware.display.VirtualDisplay;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.projection.MediaProjection;
-import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -56,13 +55,9 @@ public class ScreenCaptureService extends Service {
         super.onCreate();
         Log.d(TAG, "Service created");
         
-        // Создаем канал уведомлений
         createNotificationChannel();
-
-        // Запускаем foreground с правильным типом
         startForegroundService();
 
-        // Получаем размеры экрана
         WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
@@ -70,7 +65,6 @@ public class ScreenCaptureService extends Service {
         screenHeight = metrics.heightPixels;
         screenDensity = metrics.densityDpi;
         
-        // Создаем фоновый поток
         backgroundThread = new HandlerThread("ScreenCapture");
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
@@ -79,14 +73,15 @@ public class ScreenCaptureService extends Service {
     private void startForegroundService() {
         Notification notification = createNotification();
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Android 14+
+        // ДЛЯ ВСЕХ ВЕРСИЙ Android
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10-13
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Android 8-9
+            startForeground(NOTIFICATION_ID, notification);
         } else {
-            // Android 9 и ниже
+            // Android 7 и ниже
             startForeground(NOTIFICATION_ID, notification);
         }
     }
@@ -120,7 +115,6 @@ public class ScreenCaptureService extends Service {
         this.mediaProjection = mediaProjection;
         isCapturing = true;
         
-        // Создаем ImageReader для захвата кадров
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2);
         
         imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
@@ -139,7 +133,6 @@ public class ScreenCaptureService extends Service {
             }
         }, backgroundHandler);
         
-        // Создаем виртуальный дисплей для захвата
         virtualDisplay = mediaProjection.createVirtualDisplay(
                 "ScreenCapture",
                 screenWidth, screenHeight, screenDensity,
@@ -231,7 +224,6 @@ public class ScreenCaptureService extends Service {
         
         Log.d(TAG, "⏹ Screen capture stopped");
         
-        // Останавливаем сервис
         stopForeground(true);
         stopSelf();
     }
@@ -249,4 +241,4 @@ public class ScreenCaptureService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-}
+                }
