@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
@@ -58,8 +59,8 @@ public class ScreenCaptureService extends Service {
         // Создаем канал уведомлений
         createNotificationChannel();
 
-        // Запускаем foreground
-        startForeground(NOTIFICATION_ID, createNotification());
+        // Запускаем foreground с правильным типом
+        startForegroundService();
 
         // Получаем размеры экрана
         WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
@@ -73,6 +74,21 @@ public class ScreenCaptureService extends Service {
         backgroundThread = new HandlerThread("ScreenCapture");
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    private void startForegroundService() {
+        Notification notification = createNotification();
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // Android 14+
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10-13
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else {
+            // Android 9 и ниже
+            startForeground(NOTIFICATION_ID, notification);
+        }
     }
 
     private void createNotificationChannel() {
@@ -233,4 +249,4 @@ public class ScreenCaptureService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-                        }
+}
