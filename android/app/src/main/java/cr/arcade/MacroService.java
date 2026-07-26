@@ -8,6 +8,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.graphics.Rect;
 
 import androidx.annotation.RequiresApi;
 
@@ -36,14 +38,22 @@ public class MacroService extends AccessibilityService {
             event.getEventType() == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START) {
             
             if (isRecording && listener != null) {
-                // Получаем координаты клика
-                int x = event.getWindowId();
-                // Альтернативный способ - через getSource
-                if (event.getSource() != null) {
-                    int[] location = new int[2];
-                    event.getSource().getLocationOnScreen(location);
-                    int clickX = location[0];
-                    int clickY = location[1];
+                AccessibilityNodeInfo source = event.getSource();
+                if (source != null) {
+                    // Получаем координаты через Rect
+                    Rect rect = new Rect();
+                    source.getBoundsInScreen(rect);
+                    int clickX = rect.centerX();
+                    int clickY = rect.centerY();
+                    
+                    // Если координаты (0,0) - пробуем другой способ
+                    if (clickX == 0 && clickY == 0) {
+                        // Пробуем получить через getBoundsInParent
+                        Rect parentRect = new Rect();
+                        source.getBoundsInParent(parentRect);
+                        clickX = parentRect.centerX();
+                        clickY = parentRect.centerY();
+                    }
                     
                     long currentTime = System.currentTimeMillis();
                     long delay = currentTime - lastActionTime;
@@ -51,6 +61,8 @@ public class MacroService extends AccessibilityService {
                     
                     Log.d("MacroService", "📝 Клик обнаружен: (" + clickX + ", " + clickY + ")");
                     listener.onActionRecorded(clickX, clickY, delay);
+                    
+                    source.recycle();
                 }
             }
         }
