@@ -26,6 +26,7 @@ public class MacroService extends AccessibilityService {
     private boolean isRecording = false;
     private long lastActionTime = 0;
     private int actionCount = 0;
+    private long lastEventTime = 0;
     
     // ТОЛЬКО ИНДИКАТОР (НЕ БЛОКИРУЕТ!)
     private FrameLayout indicatorOverlay;
@@ -38,37 +39,58 @@ public class MacroService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (isRecording && recordingListener != null) {
-            int eventType = event.getEventType();
+        if (!isRecording || recordingListener == null) return;
+        
+        int eventType = event.getType();
+        long currentTime = System.currentTimeMillis();
+        
+        // ===== ФИЛЬТР: ТОЛЬКО РЕАЛЬНЫЕ КЛИКИ =====
+        boolean isClick = false;
+        
+        // Основные типы кликов
+        if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
+            isClick = true;
+        }
+        
+        // Дополнительно: проверяем что событие НЕ системное
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+            eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_SELECTED) {
             
-            // Ловим ВСЕ возможные типы событий
-            if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
-                eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
-                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
-                eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-                eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
-                eventType == AccessibilityEvent.TYPE_VIEW_SELECTED ||
-                eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+            // Проверяем, что это реальный клик, а не системное обновление
+            AccessibilityNodeInfo source = event.getSource();
+            if (source != null) {
+                // Если есть текст или описание - это UI элемент, а не игра
+                CharSequence text = source.getText();
+                CharSequence desc = source.getContentDescription();
+                if ((text != null && text.length() > 0) || (desc != null && desc.length() > 0)) {
+                    isClick = true;
+                }
+            }
+        }
+        
+        // ===== АНТИ-СПАМ: не записываем чаще чем 50мс =====
+        if (isClick && (currentTime - lastEventTime) > 50) {
+            AccessibilityNodeInfo source = event.getSource();
+            if (source != null) {
+                Rect rect = new Rect();
+                source.getBoundsInScreen(rect);
                 
-                AccessibilityNodeInfo source = event.getSource();
-                if (source != null) {
-                    Rect rect = new Rect();
-                    source.getBoundsInScreen(rect);
+                int x = rect.centerX();
+                int y = rect.centerY();
+                
+                // Проверяем валидность координат
+                if (x > 0 && y > 0 && rect.width() > 0 && rect.height() > 0) {
+                    long delay = currentTime - lastActionTime;
+                    if (delay < 50) delay = 50;
+                    lastActionTime = currentTime;
+                    lastEventTime = currentTime;
+                    actionCount++;
                     
-                    int x = rect.centerX();
-                    int y = rect.centerY();
-                    
-                    // Проверяем, что координаты валидные
-                    if (x > 0 && y > 0 && rect.width() > 0 && rect.height() > 0) {
-                        long currentTime = System.currentTimeMillis();
-                        long delay = currentTime - lastActionTime;
-                        if (delay < 50) delay = 50;
-                        lastActionTime = currentTime;
-                        actionCount++;
-                        
-                        // Отправляем в UI
-                        recordingListener.onActionRecorded(x, y, delay);
-                    }
+                    // Отправляем в UI
+                    recordingListener.onActionRecorded(x, y, delay);
                 }
             }
         }
@@ -118,7 +140,6 @@ public class MacroService extends AccessibilityService {
                 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
-                    // Пробуем альтернативный метод
                     performAlternativeClick(x, y);
                 }
             }, null);
@@ -179,6 +200,7 @@ public class MacroService extends AccessibilityService {
         this.recordingListener = listener;
         this.isRecording = true;
         this.lastActionTime = System.currentTimeMillis();
+        this.lastEventTime = 0;
         this.actionCount = 0;
         
         showIndicatorOverlay();
@@ -313,4 +335,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-            }
+                }
