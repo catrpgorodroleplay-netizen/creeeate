@@ -11,9 +11,9 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
-import android.widget.Button;
 import android.widget.Toast;
 
 public class MacroService extends AccessibilityService {
@@ -29,7 +29,6 @@ public class MacroService extends AccessibilityService {
     private FrameLayout recordingOverlay;
     private boolean isOverlayShown = false;
     
-    // Координаты для записи
     private float touchStartX, touchStartY;
     private boolean isSwiping = false;
 
@@ -56,7 +55,7 @@ public class MacroService extends AccessibilityService {
     public void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
-        Toast.makeText(this, "✅ Макрос сервис готов", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "✅ Сервис готов", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -70,38 +69,31 @@ public class MacroService extends AccessibilityService {
         return instance;
     }
 
-    // ===== ВЫПОЛНЕНИЕ КЛИКА =====
     public void doClick(int x, int y) {
         try {
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // ===== ВЫПОЛНЕНИЕ СВАЙПА =====
     public void doSwipe(int x1, int y1, int x2, int y2, long duration) {
         try {
             Path swipePath = new Path();
             swipePath.moveTo(x1, y1);
             swipePath.lineTo(x2, y2);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // ===== ЗАПИСЬ МАКРОСА =====
     public void startRecording(RecordingListener listener) {
         if (isRecording) return;
         
@@ -112,7 +104,7 @@ public class MacroService extends AccessibilityService {
         
         showRecordingOverlay();
         
-        Toast.makeText(this, "🔴 Запись начата! Кликайте на зеленом экране", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔴 ЗАПИСЬ НАЧАТА!", Toast.LENGTH_SHORT).show();
     }
 
     public void stopRecording() {
@@ -126,20 +118,13 @@ public class MacroService extends AccessibilityService {
             recordingListener = null;
         }
         
-        Toast.makeText(this, "⏹ Запись остановлена. Записано: " + actionCount + " действий", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "⏹ ЗАПИСЬ ОСТАНОВЛЕНА: " + actionCount + " действий", Toast.LENGTH_SHORT).show();
     }
 
     public boolean isRecording() {
         return isRecording;
     }
 
-    public void stopRecordingFromActivity() {
-        if (isRecording) {
-            stopRecording();
-        }
-    }
-
-    // ===== ЗЕЛЕНЫЙ ОВЕРЛЕЙ ДЛЯ ЗАПИСИ =====
     private void showRecordingOverlay() {
         if (windowManager == null || isOverlayShown) return;
         
@@ -169,12 +154,10 @@ public class MacroService extends AccessibilityService {
                             float dy2 = event.getRawY() - touchStartY;
                             
                             if (isSwiping || Math.abs(dx2) > 30 || Math.abs(dy2) > 30) {
-                                // Свайп
                                 int x1 = (int) touchStartX;
                                 int y1 = (int) touchStartY;
                                 int x2 = (int) event.getRawX();
                                 int y2 = (int) event.getRawY();
-                                long duration = System.currentTimeMillis() - lastActionTime;
                                 
                                 long currentTime = System.currentTimeMillis();
                                 long delay = currentTime - lastActionTime;
@@ -184,7 +167,6 @@ public class MacroService extends AccessibilityService {
                                 
                                 recordingListener.onSwipeRecorded(x1, y1, x2, y2, delay);
                             } else {
-                                // Клик
                                 int x = (int) event.getRawX();
                                 int y = (int) event.getRawY();
                                 
@@ -197,7 +179,6 @@ public class MacroService extends AccessibilityService {
                                 recordingListener.onActionRecorded(x, y, delay);
                             }
                             
-                            // Вибрация
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 vibrate(15);
                             }
@@ -208,10 +189,9 @@ public class MacroService extends AccessibilityService {
                 }
             };
             
-            // ЗЕЛЕНЫЙ ФОН С ПРОЗРАЧНОСТЬЮ
-            recordingOverlay.setBackgroundColor(0x8800FF00); // Зеленый с прозрачностью 50%
+            recordingOverlay.setBackgroundColor(0x8800FF00);
             
-            // Кнопка СТОП (в правом верхнем углу, НЕ перекрывает зеленый фон)
+            // Кнопка СТОП
             Button stopBtn = new Button(this);
             stopBtn.setText("⏹ СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
@@ -260,10 +240,9 @@ public class MacroService extends AccessibilityService {
             textParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
             textParams.setMargins(0, 40, 0, 0);
             recordText.setLayoutParams(textParams);
-            
             recordingOverlay.addView(recordText);
             
-            // Счетчик действий
+            // Счетчик
             final TextView counterText = new TextView(this);
             counterText.setText("0");
             counterText.setTextColor(0xFFFFFFFF);
@@ -283,10 +262,8 @@ public class MacroService extends AccessibilityService {
                     FrameLayout.LayoutParams.WRAP_CONTENT);
             counterParams.gravity = Gravity.CENTER;
             counterText.setLayoutParams(counterParams);
-            
             recordingOverlay.addView(counterText);
             
-            // Обновляем счетчик
             final Handler counterHandler = new Handler();
             counterHandler.post(new Runnable() {
                 @Override
@@ -346,4 +323,4 @@ public class MacroService extends AccessibilityService {
             }
         }
     }
-                }
+    }
