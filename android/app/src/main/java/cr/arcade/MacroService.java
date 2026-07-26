@@ -4,12 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityNodeInfo;
-import android.graphics.Rect;
 
 import androidx.annotation.RequiresApi;
 
@@ -19,7 +15,6 @@ public class MacroService extends AccessibilityService {
     private RecordingListener listener;
     private boolean isRecording = false;
     private long lastActionTime = 0;
-    private Handler handler = new Handler(Looper.getMainLooper());
     
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
@@ -32,40 +27,7 @@ public class MacroService extends AccessibilityService {
     
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Отслеживаем клики
-        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED ||
-            event.getEventType() == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ||
-            event.getEventType() == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START) {
-            
-            if (isRecording && listener != null) {
-                AccessibilityNodeInfo source = event.getSource();
-                if (source != null) {
-                    // Получаем координаты через Rect
-                    Rect rect = new Rect();
-                    source.getBoundsInScreen(rect);
-                    int clickX = rect.centerX();
-                    int clickY = rect.centerY();
-                    
-                    // Если координаты (0,0) - пробуем другой способ
-                    if (clickX == 0 && clickY == 0) {
-                        // Пробуем получить через getBoundsInParent
-                        Rect parentRect = new Rect();
-                        source.getBoundsInParent(parentRect);
-                        clickX = parentRect.centerX();
-                        clickY = parentRect.centerY();
-                    }
-                    
-                    long currentTime = System.currentTimeMillis();
-                    long delay = currentTime - lastActionTime;
-                    lastActionTime = currentTime;
-                    
-                    Log.d("MacroService", "📝 Клик обнаружен: (" + clickX + ", " + clickY + ")");
-                    listener.onActionRecorded(clickX, clickY, delay);
-                    
-                    source.recycle();
-                }
-            }
-        }
+        // НЕ ИСПОЛЬЗУЕМ ДЛЯ ЗАПИСИ - запись идет через оверлей
     }
     
     @Override
