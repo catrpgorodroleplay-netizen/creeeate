@@ -14,7 +14,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
     <!-- ==================== СИСТЕМНЫЕ РАЗРЕШЕНИЯ ==================== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -26,6 +25,9 @@
     
     <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ МАКРОСОВ ==================== -->
     <uses-permission android:name="android.permission.ACCESSIBILITY_SERVICE" />
+    
+    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ЗАХВАТА ЭКРАНА (Android 14+) ==================== -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
     <!-- ==================== ОПЦИОНАЛЬНО: ДЛЯ РАБОТЫ С ДРУГИМИ ПРИЛОЖЕНИЯМИ ==================== -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
