@@ -109,7 +109,6 @@ public class ScreenCaptureService extends Service {
                     image.close();
                     if (bitmap != null && listener != null) {
                         listener.onScreenCaptured(bitmap);
-                        // Определяем клики по изменениям на экране
                         detectTouch(bitmap);
                     }
                 }
@@ -145,7 +144,6 @@ public class ScreenCaptureService extends Service {
         return Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight);
     }
 
-    // Временная переменная для сравнения
     private Bitmap lastBitmap = null;
     private int lastX = -1, lastY = -1;
     private long lastTouchTime = 0;
@@ -156,18 +154,15 @@ public class ScreenCaptureService extends Service {
             return;
         }
         
-        // Сравниваем картинки и ищем изменения (клик - это изменение на экране)
         int touchX = -1, touchY = -1;
         boolean touchDetected = false;
         
-        // Проверяем только центр области (упрощенный способ)
-        int step = 20; // Проверяем каждый 20-й пиксель для скорости
+        int step = 20;
         for (int y = 0; y < screenHeight && !touchDetected; y += step) {
             for (int x = 0; x < screenWidth && !touchDetected; x += step) {
                 int pixel1 = lastBitmap.getPixel(x, y);
                 int pixel2 = currentBitmap.getPixel(x, y);
                 if (pixel1 != pixel2) {
-                    // Нашли изменение - это может быть клик
                     touchX = x;
                     touchY = y;
                     touchDetected = true;
@@ -175,7 +170,6 @@ public class ScreenCaptureService extends Service {
             }
         }
         
-        // Если нашли изменение и прошло достаточно времени (чтобы не дублировать)
         long currentTime = System.currentTimeMillis();
         if (touchDetected && (currentTime - lastTouchTime > 200)) {
             lastTouchTime = currentTime;
@@ -187,7 +181,6 @@ public class ScreenCaptureService extends Service {
             }
         }
         
-        // Сохраняем для следующего сравнения
         lastBitmap.recycle();
         lastBitmap = currentBitmap.copy(currentBitmap.getConfig(), false);
     }
@@ -214,6 +207,9 @@ public class ScreenCaptureService extends Service {
             lastBitmap.recycle();
             lastBitmap = null;
         }
+        
+        // Останавливаем foreground
+        stopForeground(true);
         
         Log.d(TAG, "Screen capture stopped");
     }
