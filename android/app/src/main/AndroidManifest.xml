@@ -26,15 +26,9 @@
     <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ МАКРОСОВ ==================== -->
     <uses-permission android:name="android.permission.ACCESSIBILITY_SERVICE" />
     
-    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ЗАХВАТА ЭКРАНА (Android 14+) ==================== -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    
     <!-- ==================== ОПЦИОНАЛЬНО: ДЛЯ РАБОТЫ С ДРУГИМИ ПРИЛОЖЕНИЯМИ ==================== -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
-    
-    <!-- ==================== ДОПОЛНИТЕЛЬНЫЕ РАЗРЕШЕНИЯ ДЛЯ ANDROID 14+ ==================== -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -60,12 +54,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- ==================== СЕРВИС ДЛЯ ЗАХВАТА ЭКРАНА ==================== -->
-        <service
-            android:name=".ScreenCaptureService"
-            android:foregroundServiceType="mediaProjection"
-            android:exported="false" />
 
         <!-- ==================== СЕРВИС ДЛЯ ФОНОВОЙ РАБОТЫ ОВЕРЛЕЯ ==================== -->
         <service
