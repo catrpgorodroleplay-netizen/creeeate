@@ -5,6 +5,5 @@
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
-    android:canRequestTouchExplorationMode="true"
     android:description="@string/macro_service_description"
     android:notificationTimeout="100" />
