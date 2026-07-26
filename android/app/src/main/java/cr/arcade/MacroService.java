@@ -41,7 +41,7 @@ public class MacroService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (!isRecording || recordingListener == null) return;
         
-        int eventType = event.getType();
+        int eventType = event.getEventType(); // ← ИСПРАВЛЕНО!
         long currentTime = System.currentTimeMillis();
         
         // ===== ФИЛЬТР: ТОЛЬКО РЕАЛЬНЫЕ КЛИКИ =====
@@ -301,7 +301,7 @@ public class MacroService extends AccessibilityService {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     getOverlayFlag(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | // КЛИКИ ПРОХОДЯТ!
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
             );
@@ -335,4 +335,4 @@ public class MacroService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
                 WindowManager.LayoutParams.TYPE_PHONE;
     }
-                }
+    }
