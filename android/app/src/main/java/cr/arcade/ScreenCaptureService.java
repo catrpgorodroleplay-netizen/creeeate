@@ -29,10 +29,9 @@ import java.nio.ByteBuffer;
 public class ScreenCaptureService extends Service {
 
     private static final String TAG = "ScreenCaptureService";
-    private static final String CHANNEL_ID = "ScreenCaptureChannel";
+    private static final String CHANNEL_ID = "screen_capture_channel";
     private static final int NOTIFICATION_ID = 1001;
 
-    private MediaProjectionManager projectionManager;
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -56,26 +55,11 @@ public class ScreenCaptureService extends Service {
         super.onCreate();
         Log.d(TAG, "Service created");
         
-        // Создаем канал уведомлений для Android 8+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Screen Capture",
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
-        }
+        // Создаем канал уведомлений
+        createNotificationChannel();
 
         // Запускаем foreground
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("CR ARCADE")
-                .setContentText("Запись макроса...")
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
-                .build();
-        startForeground(NOTIFICATION_ID, notification);
+        startForeground(NOTIFICATION_ID, createNotification());
 
         // Получаем размеры экрана
         WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
@@ -89,6 +73,30 @@ public class ScreenCaptureService extends Service {
         backgroundThread = new HandlerThread("ScreenCapture");
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Запись экрана",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Используется для записи макросов");
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private Notification createNotification() {
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("CR ARCADE")
+                .setContentText("🔴 Запись макроса...")
+                .setSmallIcon(android.R.drawable.ic_menu_camera)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build();
     }
 
     public void startCapture(MediaProjection mediaProjection, ScreenCaptureListener listener) {
@@ -124,7 +132,7 @@ public class ScreenCaptureService extends Service {
                 null, null
         );
         
-        Log.d(TAG, "Screen capture started");
+        Log.d(TAG, "✅ Screen capture started");
     }
 
     private Bitmap imageToBitmap(Image image) {
@@ -145,7 +153,6 @@ public class ScreenCaptureService extends Service {
     }
 
     private Bitmap lastBitmap = null;
-    private int lastX = -1, lastY = -1;
     private long lastTouchTime = 0;
 
     private void detectTouch(Bitmap currentBitmap) {
@@ -157,7 +164,7 @@ public class ScreenCaptureService extends Service {
         int touchX = -1, touchY = -1;
         boolean touchDetected = false;
         
-        int step = 20;
+        int step = 30;
         for (int y = 0; y < screenHeight && !touchDetected; y += step) {
             for (int x = 0; x < screenWidth && !touchDetected; x += step) {
                 int pixel1 = lastBitmap.getPixel(x, y);
@@ -171,10 +178,8 @@ public class ScreenCaptureService extends Service {
         }
         
         long currentTime = System.currentTimeMillis();
-        if (touchDetected && (currentTime - lastTouchTime > 200)) {
+        if (touchDetected && (currentTime - lastTouchTime > 300)) {
             lastTouchTime = currentTime;
-            lastX = touchX;
-            lastY = touchY;
             if (listener != null) {
                 listener.onTouchDetected(touchX, touchY);
                 Log.d(TAG, "👆 КЛИК ОБНАРУЖЕН: (" + touchX + ", " + touchY + ")");
@@ -208,10 +213,11 @@ public class ScreenCaptureService extends Service {
             lastBitmap = null;
         }
         
-        // Останавливаем foreground
-        stopForeground(true);
+        Log.d(TAG, "⏹ Screen capture stopped");
         
-        Log.d(TAG, "Screen capture stopped");
+        // Останавливаем сервис
+        stopForeground(true);
+        stopSelf();
     }
 
     @Override
@@ -227,4 +233,4 @@ public class ScreenCaptureService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-}
+                        }
