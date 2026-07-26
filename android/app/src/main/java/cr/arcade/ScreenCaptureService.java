@@ -103,4 +103,132 @@ public class ScreenCaptureService extends Service {
             @Override
             public void onImageAvailable(ImageReader reader) {
                 if (!isCapturing) return;
-                Image image = reader.acquireLatestImage
+                Image image = reader.acquireLatestImage();
+                if (image != null) {
+                    Bitmap bitmap = imageToBitmap(image);
+                    image.close();
+                    if (bitmap != null && listener != null) {
+                        listener.onScreenCaptured(bitmap);
+                        // Определяем клики по изменениям на экране
+                        detectTouch(bitmap);
+                    }
+                }
+            }
+        }, backgroundHandler);
+        
+        // Создаем виртуальный дисплей для захвата
+        virtualDisplay = mediaProjection.createVirtualDisplay(
+                "ScreenCapture",
+                screenWidth, screenHeight, screenDensity,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader.getSurface(),
+                null, null
+        );
+        
+        Log.d(TAG, "Screen capture started");
+    }
+
+    private Bitmap imageToBitmap(Image image) {
+        Image.Plane[] planes = image.getPlanes();
+        ByteBuffer buffer = planes[0].getBuffer();
+        int pixelStride = planes[0].getPixelStride();
+        int rowStride = planes[0].getRowStride();
+        int rowPadding = rowStride - pixelStride * screenWidth;
+        
+        Bitmap bitmap = Bitmap.createBitmap(
+                screenWidth + rowPadding / pixelStride,
+                screenHeight,
+                Bitmap.Config.ARGB_8888
+        );
+        bitmap.copyPixelsFromBuffer(buffer);
+        
+        return Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight);
+    }
+
+    // Временная переменная для сравнения
+    private Bitmap lastBitmap = null;
+    private int lastX = -1, lastY = -1;
+    private long lastTouchTime = 0;
+
+    private void detectTouch(Bitmap currentBitmap) {
+        if (lastBitmap == null) {
+            lastBitmap = currentBitmap.copy(currentBitmap.getConfig(), false);
+            return;
+        }
+        
+        // Сравниваем картинки и ищем изменения (клик - это изменение на экране)
+        int touchX = -1, touchY = -1;
+        boolean touchDetected = false;
+        
+        // Проверяем только центр области (упрощенный способ)
+        int step = 20; // Проверяем каждый 20-й пиксель для скорости
+        for (int y = 0; y < screenHeight && !touchDetected; y += step) {
+            for (int x = 0; x < screenWidth && !touchDetected; x += step) {
+                int pixel1 = lastBitmap.getPixel(x, y);
+                int pixel2 = currentBitmap.getPixel(x, y);
+                if (pixel1 != pixel2) {
+                    // Нашли изменение - это может быть клик
+                    touchX = x;
+                    touchY = y;
+                    touchDetected = true;
+                }
+            }
+        }
+        
+        // Если нашли изменение и прошло достаточно времени (чтобы не дублировать)
+        long currentTime = System.currentTimeMillis();
+        if (touchDetected && (currentTime - lastTouchTime > 200)) {
+            lastTouchTime = currentTime;
+            lastX = touchX;
+            lastY = touchY;
+            if (listener != null) {
+                listener.onTouchDetected(touchX, touchY);
+                Log.d(TAG, "👆 КЛИК ОБНАРУЖЕН: (" + touchX + ", " + touchY + ")");
+            }
+        }
+        
+        // Сохраняем для следующего сравнения
+        lastBitmap.recycle();
+        lastBitmap = currentBitmap.copy(currentBitmap.getConfig(), false);
+    }
+
+    public void stopCapture() {
+        isCapturing = false;
+        
+        if (virtualDisplay != null) {
+            virtualDisplay.release();
+            virtualDisplay = null;
+        }
+        
+        if (imageReader != null) {
+            imageReader.close();
+            imageReader = null;
+        }
+        
+        if (mediaProjection != null) {
+            mediaProjection.stop();
+            mediaProjection = null;
+        }
+        
+        if (lastBitmap != null) {
+            lastBitmap.recycle();
+            lastBitmap = null;
+        }
+        
+        Log.d(TAG, "Screen capture stopped");
+    }
+
+    @Override
+    public void onDestroy() {
+        stopCapture();
+        if (backgroundThread != null) {
+            backgroundThread.quit();
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}
