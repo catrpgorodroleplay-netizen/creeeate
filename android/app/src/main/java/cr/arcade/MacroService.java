@@ -134,4 +134,4 @@ public class MacroService extends AccessibilityService {
     public boolean isRecording() {
         return isRecording;
     }
-}
+        }
