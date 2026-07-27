@@ -16,8 +16,6 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.ArrayList;
-
 public class MacroService extends AccessibilityService {
     private static MacroService instance;
     private WindowManager windowManager;
@@ -289,4 +287,4 @@ public class MacroService extends AccessibilityService {
             }
         }
     }
-}
+            }
