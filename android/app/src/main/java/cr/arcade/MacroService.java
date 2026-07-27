@@ -3,113 +3,280 @@ package com.cr.arcade;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
+import android.graphics.PixelFormat;
 import android.os.Build;
-import android.util.Log;
-import android.view.accessibility.AccessibilityEvent;
-
-import androidx.annotation.RequiresApi;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
 public class MacroService extends AccessibilityService {
-    
     private static MacroService instance;
-    private RecordingListener listener;
-    private boolean isRecording = false;
-    private long lastActionTime = 0;
+    private WindowManager windowManager;
+    private Handler mainHandler = new Handler(Looper.getMainLooper());
     
+    private RecordingListener recordingListener;
+    private boolean isRecording = false;
+    private boolean isAutoClickerRunning = false;
+    private long lastActionTime = 0;
+    private int actionCount = 0;
+    
+    private FrameLayout recordingOverlay;
+    private boolean isOverlayShown = false;
+    
+    private float touchStartX, touchStartY;
+    private boolean isSwiping = false;
+
     public interface RecordingListener {
         void onActionRecorded(int x, int y, long delay);
+        void onSwipeRecorded(int x1, int y1, int x2, int y2, long delay);
         void onRecordingStopped();
     }
-    
+
+    @Override
+    public void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {}
+
+    @Override
+    public void onInterrupt() {}
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+    }
+
+    @Override
+    public void onServiceConnected() {
+        super.onServiceConnected();
+        instance = this;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        hideRecordingOverlay();
+        instance = null;
+    }
+
     public static MacroService getInstance() {
         return instance;
     }
-    
-    @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        // НЕ ИСПОЛЬЗУЕМ ДЛЯ ЗАПИСИ - запись идет через оверлей
-    }
-    
-    @Override
-    public void onInterrupt() {
-        Log.d("MacroService", "Сервис прерван");
-    }
-    
-    @Override
-    public void onServiceConnected() {
-        instance = this;
-        Log.d("MacroService", "✅ Сервис подключен!");
-    }
-    
-    public void startRecording(RecordingListener listener) {
-        this.listener = listener;
-        this.isRecording = true;
-        this.lastActionTime = System.currentTimeMillis();
-        Log.d("MacroService", "🔴 Запись начата");
-    }
-    
-    public void stopRecording() {
-        this.isRecording = false;
-        if (listener != null) {
-            listener.onRecordingStopped();
-        }
-        Log.d("MacroService", "⏹ Запись остановлена");
-    }
-    
-    public void stopRecordingFromActivity() {
-        this.isRecording = false;
-        Log.d("MacroService", "Запись остановлена из Activity");
-    }
-    
-    public void recordClick(int x, int y) {
-        if (isRecording && listener != null) {
-            long currentTime = System.currentTimeMillis();
-            long delay = currentTime - lastActionTime;
-            lastActionTime = currentTime;
-            listener.onActionRecorded(x, y, delay);
-            Log.d("MacroService", "📝 Записан клик: (" + x + ", " + y + ")");
-        }
-    }
-    
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void performClick(int x, int y) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            Log.e("MacroService", "❌ API 24+ требуется для кликов");
-            return;
-        }
-        
+
+    public void doClick(int x, int y) {
         try {
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 30));
-            
-            boolean result = dispatchGesture(gestureBuilder.build(), new GestureResultCallback() {
-                @Override
-                public void onCompleted(GestureDescription gestureDescription) {
-                    super.onCompleted(gestureDescription);
-                    Log.d("MacroService", "✅ Клик выполнен: (" + x + ", " + y + ")");
-                }
-                
-                @Override
-                public void onCancelled(GestureDescription gestureDescription) {
-                    super.onCancelled(gestureDescription);
-                    Log.e("MacroService", "❌ Клик отменен: (" + x + ", " + y + ")");
-                }
-            }, null);
-            
-            if (!result) {
-                Log.e("MacroService", "❌ Не удалось выполнить клик");
-            }
-            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 50));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
-            Log.e("MacroService", "❌ Ошибка клика: " + e.getMessage());
             e.printStackTrace();
         }
     }
-    
+
+    public void doSwipe(int x1, int y1, int x2, int y2, long duration) {
+        try {
+            Path swipePath = new Path();
+            swipePath.moveTo(x1, y1);
+            swipePath.lineTo(x2, y2);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
+            dispatchGesture(builder.build(), null, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void startRecording(RecordingListener listener) {
+        if (isRecording) return;
+        
+        this.recordingListener = listener;
+        this.isRecording = true;
+        this.lastActionTime = System.currentTimeMillis();
+        this.actionCount = 0;
+        
+        showRecordingOverlay();
+        Toast.makeText(this, "🔴 ЗАПИСЬ НАЧАТА", Toast.LENGTH_SHORT).show();
+    }
+
+    public void stopRecording() {
+        if (!isRecording) return;
+        
+        this.isRecording = false;
+        hideRecordingOverlay();
+        
+        if (recordingListener != null) {
+            recordingListener.onRecordingStopped();
+            recordingListener = null;
+        }
+        Toast.makeText(this, "⏹ ЗАПИСЬ ОСТАНОВЛЕНА: " + actionCount, Toast.LENGTH_SHORT).show();
+    }
+
     public boolean isRecording() {
         return isRecording;
     }
-}
+
+    private void showRecordingOverlay() {
+        if (windowManager == null || isOverlayShown) return;
+        
+        try {
+            recordingOverlay = new FrameLayout(this) {
+                @Override
+                public boolean onTouchEvent(MotionEvent event) {
+                    if (!isRecording || recordingListener == null) return false;
+                    
+                    switch (event.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            touchStartX = event.getRawX();
+                            touchStartY = event.getRawY();
+                            isSwiping = false;
+                            return true;
+                        case MotionEvent.ACTION_MOVE:
+                            float dx = event.getRawX() - touchStartX;
+                            float dy = event.getRawY() - touchStartY;
+                            if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+                                isSwiping = true;
+                            }
+                            return true;
+                        case MotionEvent.ACTION_UP:
+                            float dx2 = event.getRawX() - touchStartX;
+                            float dy2 = event.getRawY() - touchStartY;
+                            if (isSwiping || Math.abs(dx2) > 30 || Math.abs(dy2) > 30) {
+                                int x1 = (int) touchStartX;
+                                int y1 = (int) touchStartY;
+                                int x2 = (int) event.getRawX();
+                                int y2 = (int) event.getRawY();
+                                long currentTime = System.currentTimeMillis();
+                                long delay = currentTime - lastActionTime;
+                                if (delay < 50) delay = 50;
+                                lastActionTime = currentTime;
+                                actionCount++;
+                                recordingListener.onSwipeRecorded(x1, y1, x2, y2, delay);
+                            } else {
+                                int x = (int) event.getRawX();
+                                int y = (int) event.getRawY();
+                                long currentTime = System.currentTimeMillis();
+                                long delay = currentTime - lastActionTime;
+                                if (delay < 50) delay = 50;
+                                lastActionTime = currentTime;
+                                actionCount++;
+                                recordingListener.onActionRecorded(x, y, delay);
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                vibrate(15);
+                            }
+                            return true;
+                    }
+                    return false;
+                }
+            };
+            
+            recordingOverlay.setBackgroundColor(0x8800FF00);
+            
+            // Кнопка СТОП (красный прямоугольник)
+            Button stopBtn = new Button(this);
+            stopBtn.setText("СТОП");
+            stopBtn.setTextColor(0xFFFFFFFF);
+            stopBtn.setTextSize(18);
+            stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+            stopBtn.setPadding(40, 16, 40, 16);
+            android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
+            stopBg.setCornerRadius(8);
+            stopBg.setColor(0xFFFF0000);
+            stopBtn.setBackground(stopBg);
+            
+            FrameLayout.LayoutParams stopParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            stopParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            stopParams.setMargins(0, 40, 0, 0);
+            stopBtn.setLayoutParams(stopParams);
+            stopBtn.setOnClickListener(v -> {
+                if (isRecording) {
+                    stopRecording();
+                }
+            });
+            recordingOverlay.addView(stopBtn);
+            
+            // Счетчик
+            final TextView counterText = new TextView(this);
+            counterText.setText("0");
+            counterText.setTextColor(0xFFFFFFFF);
+            counterText.setTextSize(48);
+            counterText.setTypeface(null, android.graphics.Typeface.BOLD);
+            counterText.setGravity(Gravity.CENTER);
+            counterText.setPadding(30, 20, 30, 20);
+            
+            FrameLayout.LayoutParams counterParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            counterParams.gravity = Gravity.CENTER;
+            counterText.setLayoutParams(counterParams);
+            recordingOverlay.addView(counterText);
+            
+            final Handler counterHandler = new Handler();
+            counterHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (isRecording) {
+                        counterText.setText(String.valueOf(actionCount));
+                        counterHandler.postDelayed(this, 200);
+                    }
+                }
+            });
+            
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    getOverlayFlag(),
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT
+            );
+            params.gravity = Gravity.TOP | Gravity.START;
+            windowManager.addView(recordingOverlay, params);
+            isOverlayShown = true;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void hideRecordingOverlay() {
+        try {
+            if (recordingOverlay != null && windowManager != null && isOverlayShown) {
+                windowManager.removeView(recordingOverlay);
+                recordingOverlay = null;
+                isOverlayShown = false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private int getOverlayFlag() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY :
+                WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    private void vibrate(long ms) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                android.os.VibrationEffect effect = android.os.VibrationEffect.createOneShot(ms, 50);
+                android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+                if (vibrator != null) {
+                    vibrator.vibrate(effect);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+                }
