@@ -27,7 +27,7 @@ public class MacroService extends AccessibilityService {
     
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Не используем для записи - запись идет через оверлей
+        // Не используем для записи
     }
     
     @Override
