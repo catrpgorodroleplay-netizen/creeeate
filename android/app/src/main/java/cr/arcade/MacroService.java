@@ -16,6 +16,8 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+
 public class MacroService extends AccessibilityService {
     private static MacroService instance;
     private WindowManager windowManager;
@@ -56,6 +58,7 @@ public class MacroService extends AccessibilityService {
     public void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        Toast.makeText(this, "✅ Сервис макросов активен", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -69,6 +72,7 @@ public class MacroService extends AccessibilityService {
         return instance;
     }
 
+    // ===== ВЫПОЛНЕНИЕ КЛИКА =====
     public void doClick(int x, int y) {
         try {
             Path clickPath = new Path();
@@ -81,6 +85,7 @@ public class MacroService extends AccessibilityService {
         }
     }
 
+    // ===== ВЫПОЛНЕНИЕ СВАЙПА =====
     public void doSwipe(int x1, int y1, int x2, int y2, long duration) {
         try {
             Path swipePath = new Path();
@@ -94,7 +99,8 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    public void startRecording(RecordingListener listener) {
+    // ===== ЗАПИСЬ =====
+    public void startRecording(RecordingListener listener, boolean withOverlay) {
         if (isRecording) return;
         
         this.recordingListener = listener;
@@ -102,7 +108,10 @@ public class MacroService extends AccessibilityService {
         this.lastActionTime = System.currentTimeMillis();
         this.actionCount = 0;
         
-        showRecordingOverlay();
+        if (withOverlay) {
+            showRecordingOverlay();
+        }
+        
         Toast.makeText(this, "🔴 ЗАПИСЬ НАЧАТА", Toast.LENGTH_SHORT).show();
     }
 
@@ -123,6 +132,7 @@ public class MacroService extends AccessibilityService {
         return isRecording;
     }
 
+    // ===== ОВЕРЛЕЙ ЗАПИСИ =====
     private void showRecordingOverlay() {
         if (windowManager == null || isOverlayShown) return;
         
@@ -184,11 +194,11 @@ public class MacroService extends AccessibilityService {
             Button stopBtn = new Button(this);
             stopBtn.setText("СТОП");
             stopBtn.setTextColor(0xFFFFFFFF);
-            stopBtn.setTextSize(18);
+            stopBtn.setTextSize(20);
             stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-            stopBtn.setPadding(40, 16, 40, 16);
+            stopBtn.setPadding(50, 20, 50, 20);
             android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
-            stopBg.setCornerRadius(8);
+            stopBg.setCornerRadius(10);
             stopBg.setColor(0xFFFF0000);
             stopBtn.setBackground(stopBg);
             
@@ -196,7 +206,7 @@ public class MacroService extends AccessibilityService {
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT);
             stopParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            stopParams.setMargins(0, 40, 0, 0);
+            stopParams.setMargins(0, 50, 0, 0);
             stopBtn.setLayoutParams(stopParams);
             stopBtn.setOnClickListener(v -> {
                 if (isRecording) {
@@ -209,10 +219,10 @@ public class MacroService extends AccessibilityService {
             final TextView counterText = new TextView(this);
             counterText.setText("0");
             counterText.setTextColor(0xFFFFFFFF);
-            counterText.setTextSize(48);
+            counterText.setTextSize(60);
             counterText.setTypeface(null, android.graphics.Typeface.BOLD);
             counterText.setGravity(Gravity.CENTER);
-            counterText.setPadding(30, 20, 30, 20);
+            counterText.setPadding(40, 30, 40, 30);
             
             FrameLayout.LayoutParams counterParams = new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -279,4 +289,4 @@ public class MacroService extends AccessibilityService {
             }
         }
     }
-                }
+}
