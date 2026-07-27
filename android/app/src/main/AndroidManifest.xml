@@ -91,7 +91,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- ==================== CAPACITOR FILE PROVIDER ==================== -->
+        <!-- ==================== FILE PROVIDER ==================== -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -100,28 +100,6 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
-        </provider>
-
-        <!-- ==================== CAPACITOR CORDOVA PLUGINS ==================== -->
-        <provider
-            android:name="com.getcapacitor.CapacitorFileProvider"
-            android:authorities="${applicationId}.capacitor.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/capacitor_file_paths" />
-        </provider>
-
-        <!-- ==================== CAPACITOR BRIDGE ==================== -->
-        <provider
-            android:name="com.getcapacitor.BridgeFileProvider"
-            android:authorities="${applicationId}.capacitor.bridge.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/capacitor_bridge_file_paths" />
         </provider>
 
     </application>
