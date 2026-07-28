@@ -4,26 +4,21 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
-import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
 
+import java.util.Random;
+
 public class MacroService extends AccessibilityService {
     private static MacroService instance;
-    private Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Random random = new Random();
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Не используется
-    }
+    public void onAccessibilityEvent(AccessibilityEvent event) {}
 
     @Override
-    public void onInterrupt() {
-        // Не используется
-    }
+    public void onInterrupt() {}
 
     @Override
     public void onCreate() {
@@ -46,27 +41,30 @@ public class MacroService extends AccessibilityService {
         try {
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
+    public void performClickWithOffset(int x, int y, int offset) {
+        int ox = random.nextInt(offset * 2) - offset;
+        int oy = random.nextInt(offset * 2) - offset;
+        performClick(x + ox, y + oy);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public void performSwipe(int startX, int startY, int endX, int endY, long duration) {
         try {
-            Path swipePath = new Path();
-            swipePath.moveTo(startX, startY);
-            swipePath.lineTo(endX, endY);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
+            Path path = new Path();
+            path.moveTo(startX, startY);
+            path.lineTo(endX, endY);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -77,11 +75,9 @@ public class MacroService extends AccessibilityService {
         try {
             Path path = new Path();
             path.moveTo(x, y);
-            
-            GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
-            gestureBuilder.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
-            
-            dispatchGesture(gestureBuilder.build(), null, null);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
+            dispatchGesture(builder.build(), null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
