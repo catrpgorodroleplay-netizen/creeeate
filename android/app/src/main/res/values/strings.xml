@@ -5,4 +5,5 @@
     <string name="package_name">com.cr.arcade</string>      
     <string name="custom_url_scheme">com.cr.arcade</string>
     <string name="macro_service_description">Служба для выполнения макросов CR Arcade. Позволяет автоматически кликать в играх и приложениях.</string>
+    <string name="accessibility_service_description">CR Arcade - Сервис для выполнения макросов и автоматических действий</string>
 </resources>
