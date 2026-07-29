@@ -8,14 +8,11 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
@@ -83,6 +80,7 @@ public class MacroService extends AccessibilityService {
                 .addStroke(stroke)
                 .build();
             
+            // Исправлено: добавляем Handler
             dispatchGesture(gesture, new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
@@ -95,7 +93,7 @@ public class MacroService extends AccessibilityService {
                 public void onCancelled(GestureDescription gestureDescription) {
                     super.onCancelled(gestureDescription);
                 }
-            });
+            }, null);
         } else {
             // Для старых версий используем обычный клик
             performLegacyClick(x, y);
@@ -166,7 +164,8 @@ public class MacroService extends AccessibilityService {
             clickPath.moveTo(x, y);
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
-            dispatchGesture(gestureBuilder.build(), null);
+            // Исправлено: добавляем null Handler
+            dispatchGesture(gestureBuilder.build(), null, null);
         }
     }
 
@@ -287,7 +286,8 @@ public class MacroService extends AccessibilityService {
                 .addStroke(stroke)
                 .build();
             
-            dispatchGesture(gesture, null);
+            // Исправлено: добавляем null Handler
+            dispatchGesture(gesture, null, null);
         }
     }
 
