@@ -1,6 +1,7 @@
 package com.cr.arcade;
 
 import android.Manifest;
+import java.io.IOException;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
