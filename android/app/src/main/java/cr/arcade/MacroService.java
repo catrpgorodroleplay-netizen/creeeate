@@ -3,13 +3,10 @@ package com.cr.arcade;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
-import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 
 public class MacroService extends AccessibilityService {
@@ -45,11 +42,9 @@ public class MacroService extends AccessibilityService {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
         
         try {
-            // Создаем путь для клика (точка)
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
             
-            // Создаем жест с нажатием и отпусканием
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(clickPath, 0, 1));
             
@@ -79,12 +74,10 @@ public class MacroService extends AccessibilityService {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
         
         try {
-            // Создаем путь для свайпа
             Path swipePath = new Path();
             swipePath.moveTo(startX, startY);
             swipePath.lineTo(endX, endY);
             
-            // Создаем жест
             GestureDescription.Builder gestureBuilder = new GestureDescription.Builder();
             gestureBuilder.addStroke(new GestureDescription.StrokeDescription(swipePath, 0, duration));
             
@@ -113,7 +106,6 @@ public class MacroService extends AccessibilityService {
     public void cancelAllGestures() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Выполняем пустой жест для сброса состояния
                 Path emptyPath = new Path();
                 emptyPath.moveTo(0, 0);
                 GestureDescription.Builder builder = new GestureDescription.Builder();
