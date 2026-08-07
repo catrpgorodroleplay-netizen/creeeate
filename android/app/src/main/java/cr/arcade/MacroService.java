@@ -13,9 +13,6 @@ public class MacroService extends AccessibilityService {
 
     private static MacroService instance;
     private Handler handler = new Handler(Looper.getMainLooper());
-    
-    // Фоновый режим - не перехватывает управление
-    private boolean isBackgroundMode = true;
 
     public static MacroService getInstance() {
         return instance;
@@ -39,13 +36,13 @@ public class MacroService extends AccessibilityService {
         super.onDestroy();
     }
 
-    // ==================== КЛИК В ФОНОВОМ РЕЖИМЕ ====================
+    // ==================== КЛИК БЕЗ ЗАЖАТИЯ ====================
     
     public void performClick(int x, int y) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
         
         try {
-            // Короткий путь - клик и сразу отпускание
+            // Способ 1: Используем GestureDescription (стандартный)
             Path clickPath = new Path();
             clickPath.moveTo(x, y);
             
@@ -59,7 +56,7 @@ public class MacroService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    Log.d("MacroService", "Клик: " + x + ", " + y);
+                    Log.d("MacroService", "Клик выполнен: " + x + ", " + y);
                 }
                 
                 @Override
@@ -73,7 +70,7 @@ public class MacroService extends AccessibilityService {
         }
     }
 
-    // ==================== СВАЙП В ФОНОВОМ РЕЖИМЕ ====================
+    // ==================== СВАЙП БЕЗ ЗАЖАТИЯ ====================
     
     public void performSwipe(int startX, int startY, int endX, int endY, long duration) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
@@ -111,7 +108,6 @@ public class MacroService extends AccessibilityService {
     public void cancelAllGestures() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Пустой жест для сброса
                 Path emptyPath = new Path();
                 emptyPath.moveTo(0, 0);
                 GestureDescription.Builder builder = new GestureDescription.Builder();
@@ -121,15 +117,5 @@ public class MacroService extends AccessibilityService {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-    
-    // ==================== УПРАВЛЕНИЕ РЕЖИМОМ ====================
-    
-    public void setBackgroundMode(boolean enabled) {
-        this.isBackgroundMode = enabled;
-    }
-    
-    public boolean isBackgroundMode() {
-        return isBackgroundMode;
     }
 }
