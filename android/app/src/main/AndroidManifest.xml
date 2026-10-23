@@ -9,12 +9,12 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    
+
     <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ ФОНОВЫХ СЕРВИСОВ ==================== -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    
+
     <!-- ==================== СИСТЕМНЫЕ РАЗРЕШЕНИЯ ==================== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -22,13 +22,15 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
-    <!-- ==================== РАЗРЕШЕНИЯ ДЛЯ МАКРОСОВ ==================== -->
-    <uses-permission android:name="android.permission.ACCESSIBILITY_SERVICE" />
-    
-    <!-- ==================== ОПЦИОНАЛЬНО: ДЛЯ РАБОТЫ С ДРУГИМИ ПРИЛОЖЕНИЯМИ ==================== -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+
+    <!-- FIX: нужен для BootReceiver, иначе BOOT_COMPLETED не придёт -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- REMOVED: android.permission.ACCESSIBILITY_SERVICE не существует в SDK.
+         Он объявляется на сервисе через android:permission="...BIND_ACCESSIBILITY_SERVICE" (уже есть ниже). -->
+
+    <!-- REMOVED: QUERY_ALL_PACKAGES и PACKAGE_USAGE_STATS — MainActivity их не использует.
+         QUERY_ALL_PACKAGES ревьюится Google Play, оставлять без причины не стоит. -->
 
     <application
         android:allowBackup="true"
@@ -55,14 +57,16 @@
             </intent-filter>
         </activity>
 
-        <!-- ==================== СЕРВИС ДЛЯ ФОНОВОЙ РАБОТЫ ОВЕРЛЕЯ ==================== -->
+        <!-- ==================== KEEP-ALIVE (MainActivity.startKeepAlive) ==================== -->
+        <!-- FIX: сервис запускается из MainActivity, но не был объявлен в манифесте.
+             На Android 14+ тип specialUse требует <property> с уникальным значением. -->
         <service
-            android:name=".OverlayService"
+            android:name=".KeepAliveService"
             android:foregroundServiceType="specialUse"
             android:exported="false">
             <property
                 android:name="android.foreground_service_type_special_use"
-                android:value="overlay_service" />
+                android:value="keep_alive" />
         </service>
 
         <!-- ==================== СЕРВИС ДЛЯ МИКРОФОНА ==================== -->
@@ -111,6 +115,21 @@
             </intent-filter>
         </receiver>
 
-    </application>
+        <!-- REMOVED: <service android:name=".OverlayService" .../>.
+             MainActivity оверлей рисует напрямую через WindowManager.addView() —
+             отдельный OverlayService не запускается ни из одной точки кода.
+             Если он у тебя реально есть и стартует из BootReceiver/KeepAliveService —
+             верни блок ниже и добавь startForeground(..., FOREGROUND_SERVICE_TYPE_SPECIAL_USE):
 
+        <service
+            android:name=".OverlayService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.foreground_service_type_special_use"
+                android:value="overlay_service" />
+        </service>
+        -->
+
+    </application>
 </manifest>
