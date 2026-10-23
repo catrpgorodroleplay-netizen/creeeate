@@ -1,4 +1,4 @@
-package com.cr.arcade;
+package cr.arcade;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
