@@ -1,4 +1,4 @@
-package cr.arcade;
+package com.cr.acrade;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
