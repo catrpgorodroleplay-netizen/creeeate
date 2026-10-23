@@ -1,4 +1,4 @@
-package com.cr.arcade;
+package cr.arcade;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
