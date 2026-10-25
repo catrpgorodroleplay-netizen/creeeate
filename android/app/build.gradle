@@ -30,6 +30,16 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    // ==================== УПАКОВКА НАТИВНЫХ БИБЛИОТЕК ====================
+    // useLegacyPackaging = true — .so сжимаются и извлекаются в nativeLibraryDir
+    // при установке. Нужно для librustunnel.so и прочих библиотек, которые
+    // ожидают физического наличия файла на ФС (встроенный PHP и т.п.).
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 repositories {
