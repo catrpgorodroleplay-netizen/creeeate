@@ -1,0 +1,71 @@
+name: Build playit agent for Android arm64
+
+# Запуск вручную: вкладка Actions > "Build playit agent for Android arm64" > Run workflow.
+# Результат: артефакт "playit-android-arm64" с файлами libplayit*.so.
+# Положите их в app/src/main/jniLibs/arm64-v8a/ (в app/build.gradle: android.packagingOptions.jniLibs.useLegacyPackaging = true,
+# в манифесте: android:extractNativeLibs="true"), иначе Android не даст запустить файл.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Тег playit-agent"
+        default: "v1.0.12"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout playit-agent
+        uses: actions/checkout@v4
+        with:
+          repository: playit-cloud/playit-agent
+          ref: ${{ inputs.ref }}
+          path: playit-agent
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Show workspace binaries
+        working-directory: playit-agent
+        run: |
+          cargo metadata --no-deps --format-version 1 \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); [print(p['name'], t['name']) for p in d['packages'] for t in p['targets'] if 'bin' in t['kind']]"
+
+      - name: Build (arm64-v8a)
+        working-directory: playit-agent
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: cargo ndk -t arm64-v8a build --release --bins
+
+      - name: Collect binaries
+        run: |
+          mkdir -p out
+          cd playit-agent/target/aarch64-linux-android/release
+          for n in playit playitd playit-cli; do
+            if [ -f "$n" ]; then
+              cp "$n" "../../../../out/lib${n}.so"
+              echo "OK: $n"
+            fi
+          done
+          ls -la ../../../../out
+          file ../../../../out/* || true
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: playit-android-arm64
+          path: out/*.so
+          if-no-files-found: error
