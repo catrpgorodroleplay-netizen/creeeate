@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
@@ -25,7 +26,6 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:extractNativeLibs="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
@@ -52,8 +52,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Служба макросов (специальные возможности) — ваша существующая, оставьте как есть.
-             Имя xml-файла настроек подставьте своё, если оно отличается. -->
+        <!-- Служба макросов (специальные возможности) -->
         <service
             android:name=".MacroService"
             android:exported="false"
@@ -65,21 +64,6 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <!-- Запасной хозяин оверлея; нужен, только если нет разрешения «поверх других приложений».
-             Если в проекте такой записи уже есть — оставьте свою. -->
-        <service
-            android:name=".MainActivity$OverlayAccService"
-            android:exported="false"
-            android:label="ARCADE Оверлей"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/overlay_acc_config" />
         </service>
 
         <!-- Фоновая работа: оверлей, голос WebView, макросы, встроенный сервер -->
